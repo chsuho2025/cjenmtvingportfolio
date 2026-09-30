@@ -1,3 +1,10 @@
 {
-  "framework": null
+  "framework": null,
+  "cleanUrls": true,
+  "headers": [
+    {
+      "source": "/assets/media/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }]
+    }
+  ]
 }
