@@ -88,7 +88,7 @@
       page === "home" && SITE.showIntro && filled(SITE.intro) ? `<p class="site-header__intro">${esc(SITE.intro)}</p>` : "";
     const nav =
       page === "home"
-        ? `<button class="motion-toggle" type="button" aria-pressed="true">모션 켜짐</button><a href="#site-footer">연락처</a>`
+        ? `<button class="motion-toggle" type="button" aria-pressed="true">모션 켜짐</button>`
         : `<a href="${homeHref()}">전체 작업</a>`;
     return `
       <a class="brand" href="${homeHref()}">
@@ -192,7 +192,7 @@
 
     gallery(sec) {
       const items = (sec.items || []).map((m) => media(m)).filter(Boolean);
-      return items.length ? `<div class="gallery-grid">${items.join("")}</div>` : "";
+      return items.length ? `${sec.body ? `<div class="prose section-intro">${paragraphs(sec.body)}</div>` : ""}<div class="gallery-grid">${items.join("")}</div>` : "";
     },
 
     cases(sec) {
@@ -200,7 +200,7 @@
         .map((c) => {
           const notes = [
             ["문제", c.problem],
-            ["수정", c.change],
+            ["해결", c.change],
             ["결과", c.result],
           ]
             .filter(([, v]) => text(v))
@@ -227,9 +227,6 @@
 
     layers(sec) {
       const TAGS = { ai: "AI 생성", self: "직접 제작·편집", mixed: "AI 생성 후 직접 편집" };
-      const legend = `<ul class="legend" aria-label="표시 기준">${Object.entries(TAGS)
-        .map(([k, v]) => `<li><span class="tag tag--${k}">${v}</span></li>`)
-        .join("")}</ul>`;
       const rows = (sec.items || [])
         .map((l) => {
           const tag = TAGS[l.source]
@@ -250,7 +247,7 @@
             </li>`;
         })
         .join("");
-      return legend + `<ul class="layers">${rows}</ul>`;
+      return (sec.body ? `<div class="prose section-intro">${paragraphs(sec.body)}</div>` : "") + `<ul class="layers">${rows}</ul>`;
     },
   };
 
@@ -309,7 +306,7 @@
     return `
       <section class="block${sec.wide ? " block--wide" : ""}" aria-labelledby="${id}">
         <h2 class="block__title" id="${id}">${esc(sec.heading || "")}</h2>
-        <div class="block__body">${body}</div>
+        <div class="block__body">${sec.collapsible ? `<details class="additional-work"><summary>${esc(sec.toggleLabel || "추가 작업 보기")}</summary><div class="additional-work__body">${body}</div></details>` : body}</div>
       </section>`;
   }
 
@@ -430,8 +427,8 @@
           <h1 class="project__title">${esc(p.title)}</h1>
           <p class="project__lead">${text(p.lead) || esc(p.summary)}</p>
         </header>
-        ${p.hero ? `<div class="project__hero">${media(p.hero, { hero: true })}</div>` : ""}
         ${meta ? `<dl class="project__meta">${meta}</dl>` : ""}
+        ${p.hero ? `<div class="project__hero">${media(p.hero, { hero: true })}</div>` : ""}
         ${(p.sections || []).map(section).join("")}
       </article>
       <nav class="more" aria-labelledby="more-title">

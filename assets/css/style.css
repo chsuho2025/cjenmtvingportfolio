@@ -350,3 +350,16 @@ button { font: inherit; }
 .live-demo__frame { display:block; width:100%; height:640px; border:1px solid #e5e5e1; border-radius:12px; background:#fff; }
 .live-demo__note { color:#777; font-size:13px; margin-top:12px; }
 @media(max-width:720px) { .live-demo__frame {height:560px;} }
+
+/* 핵심 과정과 결과를 먼저 읽을 수 있도록 정리 */
+.section-intro { margin-bottom: 28px; }
+.additional-work { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.additional-work summary { padding: 18px 0; cursor: pointer; font-weight: 500; }
+.additional-work__body { padding: 8px 0 24px; }
+.project__meta + .project__hero { margin-top: 40px; }
+
+@media (max-width: 480px) {
+  .project__meta { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .project__meta > div { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 12px; }
+  .project__meta dd { margin-top: 0; }
+}
