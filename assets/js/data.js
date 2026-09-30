@@ -1,4 +1,4 @@
-/* 실제 작업 기록과 대조한 콘텐츠 */
+/* 실제 작업 기록과 사용자 확인을 반영한 콘텐츠 */
 window.PORTFOLIO = {
   "site": {
     "name": "SOOHO CHOI",
@@ -32,19 +32,13 @@ window.PORTFOLIO = {
       "lead": "정보성 영상을 만드는 창작자를 위한 AI 영상 제작 도구입니다.",
       "card": {
         "type": "image",
-        "src": "assets/media/antiframe/landing.png",
+        "src": "assets/media/antiframe/cover.svg",
         "poster": null,
-        "alt": "Antiframe 서비스 화면",
+        "alt": "Antiframe AI 영상 제작 서비스",
         "position": "50% 50%",
         "label": "카드 이미지 (정사각형, 1200px 이상)"
       },
-      "hero": {
-        "type": "image",
-        "src": "assets/media/antiframe/landing.png",
-        "aspect": "477/709",
-        "alt": "Antiframe 초기 서비스 화면",
-        "caption": "Antiframe 초기 서비스 화면"
-      },
+      "hero": null,
       "meta": [
         {
           "label": "유형",
@@ -55,8 +49,8 @@ window.PORTFOLIO = {
           "value": "기획·개발"
         },
         {
-          "label": "현재",
-          "value": "42명 베타 테스트"
+          "label": "베타 테스트",
+          "value": "42명 참여"
         }
       ],
       "sections": [
@@ -70,51 +64,20 @@ window.PORTFOLIO = {
         },
         {
           "type": "text",
-          "heading": "현재 운영 상황",
-          "facts": [
-            {
-              "label": "베타 테스터",
-              "value": "42명"
-            }
-          ],
+          "heading": "사용자와 함께 다듬은 제작 흐름",
           "body": [
-            "현재 42명의 베타 테스터와 함께 사용성을 검증하고 있습니다.",
-            "신규 AI 모델을 검토해 적용하고, 사용자 피드백과 결과물 평가를 업데이트에 반영하고 있습니다."
+            "42명의 베타 테스터와 사용성을 검증하며, 신규 AI 모델 적용 결과와 사용자 피드백을 업데이트에 반영해 왔습니다."
           ]
         },
         {
-          "type": "text",
-          "heading": "제작자가 검토하고 수정하는 흐름",
-          "body": [
-            "자료 입력부터 음성 제작과 편집까지 이어지는 공정을 연결하고, 생성된 결과를 사용자가 검토·수정할 수 있도록 설계했습니다. 신규 모델 적용 결과와 사용성 피드백을 다음 업데이트에 반영하고 있습니다."
-          ]
-        },
-        {
-          "type": "gallery",
-          "heading": "초기 서비스 설계 화면",
-          "items": [
-            {
-              "type": "image",
-              "src": "assets/media/antiframe/format-select.png",
-              "aspect": "1/1",
-              "alt": "제작 형식 선택 화면",
-              "caption": "제작 형식 선택 화면"
-            },
-            {
-              "type": "image",
-              "src": "assets/media/antiframe/voice-select.png",
-              "aspect": "1/1",
-              "alt": "목소리 선택 화면",
-              "caption": "목소리 선택 화면"
-            }
-          ]
-        },
-        {
-          "type": "cta",
-          "heading": "데모",
-          "label": "직접 제작해 보기",
-          "url": null,
-          "note": "새 탭에서 Antiframe 데모가 열립니다."
+          "type": "live-demo",
+          "wide": true,
+          "heading": "실제 서비스 화면",
+          "url": "https://antiframe.vercel.app/dashboard",
+          "title": "Antiframe 실제 서비스 대시보드",
+          "label": "새 탭에서 서비스 열기",
+          "status": "현재 서비스 복구 점검 중입니다. 화면을 둘러볼 수 있으나 로그인과 영상 생성은 아직 이용할 수 없습니다.",
+          "note": "복구 후 로그인과 제작 기능은 새 탭에서 이용해 주세요."
         }
       ]
     },
@@ -151,6 +114,14 @@ window.PORTFOLIO = {
         {
           "label": "주요 역할",
           "value": "이미지·영상 생성, 편집·합성"
+        },
+        {
+          "label": "제작 기간",
+          "value": "2025.10–2025.12"
+        },
+        {
+          "label": "담당 비중",
+          "value": "본인 100% · 영상 제작 전 과정"
         }
       ],
       "sections": [

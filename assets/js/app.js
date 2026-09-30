@@ -148,6 +148,15 @@
       .join("");
 
   const renderers = {
+    "live-demo"(s) {
+      if (!filled(s.url)) return "";
+      return `<div class="live-demo">
+        ${s.status ? `<p class="live-demo__status">${esc(s.status)}</p>` : ""}
+        <div class="live-demo__toolbar"><a class="btn" href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.label)}${ICON_ARROW}${NEW_TAB}</a></div>
+        <iframe class="live-demo__frame" src="${esc(s.url)}" title="${esc(s.title)}" loading="lazy" allow="fullscreen" allowfullscreen></iframe>
+        <p class="live-demo__note">${esc(s.note || "")}</p>
+      </div>`;
+    },
     text(sec) {
       const facts = (sec.facts || []).length
         ? `<dl class="facts">${sec.facts.map((f) => `<div><dt>${esc(f.label)}</dt><dd>${text(f.value)}</dd></div>`).join("")}</dl>`
@@ -421,7 +430,7 @@
           <h1 class="project__title">${esc(p.title)}</h1>
           <p class="project__lead">${text(p.lead) || esc(p.summary)}</p>
         </header>
-        <div class="project__hero">${media(p.hero, { hero: true })}</div>
+        ${p.hero ? `<div class="project__hero">${media(p.hero, { hero: true })}</div>` : ""}
         ${meta ? `<dl class="project__meta">${meta}</dl>` : ""}
         ${(p.sections || []).map(section).join("")}
       </article>
