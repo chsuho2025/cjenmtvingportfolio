@@ -183,40 +183,15 @@ button { font: inherit; }
   to   { opacity: 1; transform: none; }
 }
 
-/* 공간형 갤러리 — 세 작품은 모두 보이면서 시점과 깊이가 반응합니다. */
-.gallery.is-spatial {
-  transform-style: preserve-3d;
-  transform: perspective(1600px) translate3d(var(--scene-x, 0px), var(--scene-y, 0px), 0) rotateX(var(--scene-rx, 0deg)) rotateY(var(--scene-ry, 0deg));
-}
-.gallery.is-spatial .card-item {
-  position: relative;
-  animation: gallery-drift 8s ease-in-out infinite;
-  animation-delay: calc(var(--i) * -2.6s);
-}
-.gallery.is-spatial .card__frame {
-  border-radius: 8px;
-  box-shadow: 0 30px 42px -30px rgba(0,0,0,.22), 0 10px 28px -18px rgba(0,0,0,calc(.15 + var(--h) * .3));
-}
-.gallery.is-spatial .card__frame::after {
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  border: 1px solid rgba(0,0,0,.04); border-radius: inherit;
-  background: radial-gradient(ellipse at var(--light-x, 50%) var(--light-y, 40%), rgba(255,255,255,.42), transparent 70%);
-  opacity: calc(.25 + var(--h) * .65);
-}
-.gallery.is-spatial .card__caption { padding-top: 25px; }
-.gallery.is-spatial.is-intro .card-item {
-  animation: spatial-reveal 1.5s cubic-bezier(.16,1,.3,1) both;
-  animation-delay: calc(var(--i) * 150ms + 80ms);
-}
-.gallery.is-paused .card-item { animation-play-state: paused; }
-@keyframes gallery-drift {
-  0%,100% { transform: translateY(7px); }
-  50% { transform: translateY(-7px); }
-}
-@keyframes spatial-reveal {
-  from { opacity: 0; transform: perspective(1000px) translateY(85px) rotateX(25deg) rotateY(-14deg) scale(.9); }
-  to { opacity: 1; transform: none; }
-}
+/* The image plane bends; captions remain still and readable. */
+.wave-canvas { display:none; position:absolute; width:112%; height:112%; left:-6%; top:-6%; pointer-events:none; }
+.card__frame.wave-ready { overflow:visible; background:transparent; box-shadow:none; }
+.wave-ready .card__media { opacity:0; }
+.wave-ready .wave-canvas { display:block; }
+.gallery.is-wave .card__caption { padding-top:18px; }
+.gallery.is-wave .card__frame { transition:none; }
+.gallery.is-wave .card:active .card__frame { scale:1; }
+@media (prefers-reduced-motion: reduce) { .wave-canvas { display:none!important; } .wave-ready .card__media { opacity:1; } }
 
 /* ───────── project page ───────── */
 .project { max-width: calc(var(--content-max) + 2 * var(--page-pad)); margin: 0 auto; padding: 0 var(--page-pad); }
@@ -366,3 +341,5 @@ button { font: inherit; }
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   .gallery, .card-item, .card__frame, .card__media { transform: none !important; }
 }
+.media__external { display:inline-block; margin-left:12px; text-underline-offset:3px; }
+.wave-canvas { filter:drop-shadow(0 8px 10px rgba(0,0,0,.035)); }

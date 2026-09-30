@@ -58,11 +58,13 @@
     } else if (m.type === "embed") {
       inner = `<iframe src="${esc(m.src)}" title="${alt || "영상"}" loading="lazy" allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowfullscreen></iframe>`;
     } else if (m.type === "audio") {
-      return `<audio class="audio" controls preload="none" src="${esc(src(m.src))}"></audio>`;
+      return `<audio class="audio" controls preload="metadata" src="${esc(src(m.src))}"></audio>`;
     } else {
       inner = `<img src="${esc(src(m.src))}" alt="${alt}" loading="${opts.hero ? "eager" : "lazy"}" decoding="async">`;
     }
-    const caption = filled(m.caption) ? `<figcaption>${esc(m.caption)}</figcaption>` : "";
+    const yt = m.type === "embed" && m.src.match(/youtube(?:-nocookie)?\.com\/embed\/([\w-]+)/);
+    const fallback = yt ? `<a class="media__external" href="https://www.youtube.com/watch?v=${yt[1]}" target="_blank" rel="noopener">YouTube에서 보기${NEW_TAB}</a>` : "";
+    const caption = filled(m.caption) || fallback ? `<figcaption>${filled(m.caption) ? esc(m.caption) : ""}${fallback}</figcaption>` : "";
     return `<figure class="media${portrait}" style="${style}"><div class="media__box">${inner}</div>${caption}</figure>`;
   }
 
@@ -227,7 +229,7 @@
             ? `<span class="ph-text">담당 범위 미정</span>`
             : "";
           const audio = l.audio && filled(l.audio.src || l.audio)
-            ? `<audio class="audio" controls preload="none" src="${esc(src(l.audio.src || l.audio))}"></audio>`
+            ? `<audio class="audio" controls preload="metadata" src="${esc(src(l.audio.src || l.audio))}" aria-label="${esc(l.role)} 샘플"></audio>`
             : SHOW_PH
             ? `<span class="ph-text">${esc(l.role)} 샘플 오디오</span>`
             : "";
@@ -274,7 +276,7 @@
       const poster = filled(m.poster) ? ` poster="${esc(src(m.poster))}"` : "";
       const tag =
         cmp.type === "audio"
-          ? `<audio class="audio" controls preload="none" src="${esc(src(m.src))}" data-ab></audio>`
+          ? `<audio class="audio" controls preload="metadata" src="${esc(src(m.src))}" data-ab aria-label="${name}"></audio>`
           : `<div class="media" style="--ar:${r.css};--arn:${r.num}"><div class="media__box"><video controls playsinline preload="none"${poster} data-ab aria-label="${name}"><source src="${esc(src(m.src))}"></video></div></div>`;
       return `<div><p class="pair__label">${name}</p>${tag}</div>`;
     };
@@ -370,118 +372,7 @@
   }
 
   // 공간형 갤러리: 전체 시점 이동 + 카드별 깊이·빛·이미지 패럴랙스.
-  function tilt(root) {
-    const desktop = window.matchMedia("(min-width: 721px)");
-    const toggle = document.querySelector(".motion-toggle");
-    const stage = root.closest(".home");
-    let requested = MOTION.enabled !== false;
-    try { if (localStorage.getItem("portfolio-motion") === "off") requested = false; } catch (_) {}
-    let active = false, raf = 0, lastTime = 0;
-    const camera = { x: 0, y: 0, tx: 0, ty: 0 };
-    const cards = [...root.querySelectorAll(".card")].map((el, i, all) => ({
-      el, frame: el.querySelector(".card__frame"), inner: el.querySelector(".card__media"),
-      side: all.length > 1 ? (i / (all.length - 1)) * 2 - 1 : 0,
-      x: 0, y: 0, h: 0, tx: 0, ty: 0, th: 0,
-    }));
-    const smoothing = Math.min(Math.max(MOTION.smoothing ?? 0.09, 0.02), 1);
-    const T = MOTION.tilt ?? 9, S = MOTION.imageShift ?? 16, Z = MOTION.lift ?? 54;
-    const SC = MOTION.hoverScale ?? 1.06;
-    const arc = MOTION.arc ?? 16;
-    document.documentElement.style.setProperty("--img-bleed", `${S + 2}px`);
-    const clamp = n => Math.max(-1, Math.min(1, n));
-
-    function render(dt = 16.67) {
-      const k = 1 - Math.pow(1 - smoothing, Math.min(dt, 50) / 16.67);
-      camera.x += (camera.tx - camera.x) * k;
-      camera.y += (camera.ty - camera.y) * k;
-      root.style.setProperty("--scene-x", `${(camera.x * 14).toFixed(2)}px`);
-      root.style.setProperty("--scene-y", `${(camera.y * 7).toFixed(2)}px`);
-      root.style.setProperty("--scene-ry", `${(camera.x * 4).toFixed(2)}deg`);
-      root.style.setProperty("--scene-rx", `${(-camera.y * 2).toFixed(2)}deg`);
-      let delta = Math.abs(camera.tx - camera.x) + Math.abs(camera.ty - camera.y);
-      cards.forEach(c => {
-        c.x += (c.tx - c.x) * k;
-        c.y += (c.ty - c.y) * k;
-        c.h += (c.th - c.h) * k;
-        const yaw = -c.side * arc * (1 - c.h) + c.x * T;
-        const depth = (1 - Math.abs(c.side)) * 18 + c.h * Z;
-        c.frame.style.transform = `rotateX(${(-c.y * T).toFixed(2)}deg) rotateY(${yaw.toFixed(2)}deg) translateZ(${depth.toFixed(2)}px)`;
-        c.frame.style.setProperty("--h", c.h.toFixed(3));
-        c.frame.style.setProperty("--light-x", `${50 + c.x * 35}%`);
-        c.frame.style.setProperty("--light-y", `${40 + c.y * 30}%`);
-        c.inner.style.transform = `translate3d(${(-c.x * S).toFixed(2)}px, ${(-c.y * S).toFixed(2)}px, 0) scale(${(1 + (SC - 1) * c.h).toFixed(3)})`;
-        c.el.closest(".card-item").style.zIndex = c.th ? "3" : "1";
-        delta += Math.abs(c.tx - c.x) + Math.abs(c.ty - c.y) + Math.abs(c.th - c.h);
-      });
-      return delta;
-    }
-    function tick(time) {
-      if (!active) { raf = 0; return; }
-      const delta = render(lastTime ? time - lastTime : 16.67);
-      lastTime = time;
-      raf = delta > 0.002 ? requestAnimationFrame(tick) : 0;
-    }
-    function kick() { if (active && !raf) { lastTime = 0; raf = requestAnimationFrame(tick); } }
-    function resetTargets() {
-      camera.tx = camera.ty = 0;
-      cards.forEach(c => { c.tx = c.ty = c.th = 0; });
-      kick();
-    }
-    function sync() {
-      active = requested && !reduceMotion.matches && finePointer.matches && desktop.matches;
-      root.classList.toggle("is-spatial", active);
-      if (toggle) {
-        toggle.disabled = reduceMotion.matches || !finePointer.matches || !desktop.matches;
-        toggle.setAttribute("aria-pressed", String(active));
-        toggle.textContent = active ? "모션 켜짐" : "모션 꺼짐";
-      }
-      if (active) { render(); kick(); }
-      else {
-        cancelAnimationFrame(raf); raf = 0;
-        root.classList.remove("is-intro");
-        ["--scene-x", "--scene-y", "--scene-rx", "--scene-ry"].forEach(k => root.style.removeProperty(k));
-        camera.x = camera.y = camera.tx = camera.ty = 0;
-        cards.forEach(c => {
-          c.x = c.y = c.h = c.tx = c.ty = c.th = 0;
-          c.frame.style.removeProperty("transform"); c.frame.style.removeProperty("--h");
-          c.inner.style.removeProperty("transform");
-          c.el.closest(".card-item").style.removeProperty("z-index");
-        });
-      }
-    }
-    stage.addEventListener("pointermove", e => {
-      if (!active) return;
-      const r = stage.getBoundingClientRect();
-      camera.tx = clamp((e.clientX - r.left) / r.width * 2 - 1);
-      camera.ty = clamp((e.clientY - r.top) / r.height * 2 - 1);
-      kick();
-    });
-    stage.addEventListener("pointerleave", resetTargets);
-    cards.forEach(c => {
-      c.el.addEventListener("pointermove", e => {
-        if (!active) return;
-        const r = c.el.getBoundingClientRect();
-        c.tx = clamp((e.clientX - r.left) / r.width * 2 - 1);
-        c.ty = clamp((e.clientY - r.top) / r.height * 2 - 1);
-        c.th = 1; kick();
-      });
-      c.el.addEventListener("pointerleave", () => { c.tx = c.ty = c.th = 0; kick(); });
-      c.el.addEventListener("focus", () => { c.th = 1; kick(); });
-      c.el.addEventListener("blur", () => { c.tx = c.ty = c.th = 0; kick(); });
-    });
-    toggle?.addEventListener("click", () => {
-      requested = !requested;
-      try { localStorage.setItem("portfolio-motion", requested ? "on" : "off"); } catch (_) {}
-      sync();
-    });
-    [reduceMotion, finePointer, desktop].forEach(q => q.addEventListener("change", sync));
-    document.addEventListener("visibilitychange", () => {
-      root.classList.toggle("is-paused", document.hidden);
-      if (document.hidden) { cancelAnimationFrame(raf); raf = 0; }
-      else kick();
-    });
-    sync();
-  }
+  function tilt(root) { window.initWaveGallery?.(root, MOTION); }
 
   /* ───────── pages ───────── */
   function mountChrome(page) {
