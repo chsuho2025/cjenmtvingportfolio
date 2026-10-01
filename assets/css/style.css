@@ -183,7 +183,12 @@ button { font: inherit; }
   to   { opacity: 1; transform: none; }
 }
 
-/* The image plane bends; captions remain still and readable. */
+/* Rounded water-drop covers, with still captions and an accessible image fallback. */
+.gallery .card__frame { border-radius: 50%; }
+.gallery .card__caption { text-align: center; justify-items: center; padding-inline: 10px; }
+.gallery .card__title { justify-content: center; }
+.gallery .card:focus-visible .card__frame { outline-offset: 7px; }
+
 .wave-canvas { display:none; position:absolute; width:112%; height:112%; left:-6%; top:-6%; pointer-events:none; }
 .card__frame.wave-ready { overflow:visible; background:transparent; box-shadow:none; }
 .wave-ready .card__media { opacity:0; }
@@ -342,7 +347,7 @@ button { font: inherit; }
   .gallery, .card-item, .card__frame, .card__media { transform: none !important; }
 }
 .media__external { display:inline-block; margin-left:12px; text-underline-offset:3px; }
-.wave-canvas { filter:drop-shadow(0 8px 10px rgba(0,0,0,.035)); }
+.wave-canvas { filter:drop-shadow(0 12px 14px rgba(28,35,43,.075)); }
 
 /* Actual application preview, with an explicit new-tab route for authentication. */
 .live-demo__status { padding: 14px 16px; background: #f3f2ee; border-radius: 8px; font-size: 14px; }

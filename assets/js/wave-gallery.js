@@ -1,46 +1,58 @@
-/* Curved image planes: continuous low-frequency wave, with damped pointer response.
+/* Liquid portrait cards: soft circular silhouettes with independent surface tension.
    No external animation dependency. HTML images and links remain the fallback. */
 window.initWaveGallery = function(root, options = {}) {
   const reduce = matchMedia('(prefers-reduced-motion: reduce)');
-  const desktop = matchMedia('(min-width: 721px) and (hover: hover) and (pointer: fine)');
+  const desktop = matchMedia('(hover: hover) and (pointer: fine)');
   const toggle = document.querySelector('.motion-toggle');
   let enabled = options.enabled !== false;
   try { enabled = enabled && localStorage.getItem('portfolio-motion') !== 'off'; } catch (_) {}
   let active = false, visible = true, raf = 0, last = 0, elapsed = 0;
   const pointer = {x:0,y:0,tx:0,ty:0,energy:0};
   const vertex = `
+    precision mediump float;
     attribute vec2 a_uv;
     uniform float u_time, u_index, u_hover, u_energy;
     uniform vec2 u_pointer;
     varying vec2 v_uv;
-    varying float v_light;
     void main() {
       v_uv = a_uv;
-      float phase = (a_uv.x + u_index * 1.08) * 4.3 - u_time * .65;
-      float amplitude = .045 + .035 * u_hover + .018 * u_energy;
-      float curve = sin(phase + u_pointer.x * .22);
-      float depth = cos(phase) * (.12 + .035 * u_hover);
-      vec2 p = (a_uv - .5) * 1.77;
-      p.y += curve * amplitude;
-      p.x += sin(phase + .7) * .012;
-      p += vec2(u_pointer.x * .013, -u_pointer.y * .009);
-      float perspective = 1.0 / (1.0 - depth * .22);
-      gl_Position = vec4(p * perspective, depth * .1, 1.0);
-      v_light = 1.0 - .055 * (cos(phase) + 1.0) * .5;
+      float phase = u_time * .58 + u_index * 2.1;
+      vec2 p = (a_uv - .5) * 1.88;
+      p *= 1.0 + .012 * u_hover;
+      p.y += sin(phase) * .016;
+      p.x += cos(phase * .73) * .009;
+      p += vec2(u_pointer.x, -u_pointer.y) * .012 * u_hover;
+      gl_Position = vec4(p, 0.0, 1.0);
     }`;
   const fragment = `
     precision mediump float;
     uniform sampler2D u_image;
     uniform vec2 u_crop, u_offset;
+    uniform float u_time, u_index, u_hover, u_energy;
     varying vec2 v_uv;
-    varying float v_light;
     void main() {
-      vec2 q = abs(v_uv - .5) - vec2(.487);
-      float distance = length(max(q, 0.0)) + min(max(q.x,q.y),0.0) - .013;
-      float alpha = 1.0 - smoothstep(-.002,.001,distance);
-      vec2 uv = v_uv * u_crop + u_offset;
+      vec2 center = v_uv - .5;
+      float angle = atan(center.y, center.x);
+      float phase = u_time * .58 + u_index * 2.1;
+      float strength = 1.0 + .35 * u_hover + .12 * u_energy;
+      // Low-order waves preserve a rounded droplet rather than a wavy rectangle.
+      float contour = (.011 * sin(2.0 * angle + phase)
+                     + .008 * sin(3.0 * angle - phase * .81)
+                     + .003 * cos(5.0 * angle + phase * .57)) * strength;
+      float radius = .455 + contour;
+      float r = length(center);
+      float distance = r - radius;
+      float alpha = 1.0 - smoothstep(-.002, .001, distance);
+      // A restrained lens at the rim; the work itself stays readable.
+      float radial = clamp(r / radius, 0.0, 1.0);
+      vec2 lens = .5 + center * (.976 + .024 * radial * radial);
+      vec2 uv = lens * u_crop + u_offset;
       vec4 color = texture2D(u_image, uv);
-      gl_FragColor = vec4(color.rgb * v_light, color.a * alpha);
+      float rim = smoothstep(.92, 1.0, radial);
+      float light = .5 + .5 * dot(normalize(center + vec2(.0001)), normalize(vec2(-.65, .8)));
+      vec3 rgb = color.rgb * (1.0 - rim * .045 * (1.0 - light));
+      rgb = mix(rgb, vec3(1.0), rim * .12 * light);
+      gl_FragColor = vec4(rgb, color.a * alpha);
     }`;
   function makePlane(card,index) {
     const img = card.querySelector('.card__img');
@@ -94,7 +106,7 @@ window.initWaveGallery = function(root, options = {}) {
   }
   const planes=[...root.querySelectorAll('.card')].map(makePlane).filter(Boolean);
   function draw(p){
-    const gl=p.gl, r=p.frame.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);
+    const gl=p.gl, r=p.frame.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,desktop.matches?2:1.5);
     const size=Math.round(r.width*1.12*dpr);
     if(p.canvas.width!==size){p.canvas.width=size;p.canvas.height=size;gl.viewport(0,0,size,size);}
     gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);gl.useProgram(p.program);
@@ -115,10 +127,10 @@ window.initWaveGallery = function(root, options = {}) {
   function kick(){if(active&&!raf&&!document.hidden&&visible){last=0;raf=requestAnimationFrame(tick);}}
   function sync(){
     const supported=planes.some(p=>p.ready);
-    active=enabled&&desktop.matches&&!reduce.matches&&supported;
+    active=enabled&&!reduce.matches&&supported;
     root.classList.toggle('is-wave',active);
     planes.forEach(p=>p.frame.classList.toggle('wave-ready',active&&p.ready));
-    if(toggle){toggle.disabled=!desktop.matches||reduce.matches||!supported;toggle.setAttribute('aria-pressed',String(active));toggle.textContent=active?'모션 켜짐':'모션 꺼짐';}
+    if(toggle){toggle.disabled=reduce.matches||!supported;toggle.setAttribute('aria-pressed',String(active));toggle.textContent=active?'모션 켜짐':'모션 꺼짐';}
     if(active)kick();else{cancelAnimationFrame(raf);raf=0;last=0;}
   }
   root.closest('.home').addEventListener('pointermove',e=>{
