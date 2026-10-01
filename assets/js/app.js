@@ -135,6 +135,20 @@
       .join("");
 
   const renderers = {
+    article(sec) {
+      return (sec.parts || []).map(part => {
+        const heading = part.heading ? `<h3>${text(part.heading)}</h3>` : '';
+        const prose = part.body ? `<div class="prose">${paragraphs(part.body)}</div>` : '';
+        const steps = part.steps ? `<ol class="article-steps">${part.steps.map((step,i)=>`<li><h4><span>${String(i+1).padStart(2,'0')}</span>${text(step.title)}</h4>${paragraphs(step.body || [step.desc])}${step.output ? `<p class="article-step-output">${text(step.output)}</p>` : ''}</li>`).join('')}</ol>` : '';
+        const mediaItems = part.media ? `<div class="article-media${part.media.length>1 ? ' article-media--pair' : ''}">${part.media.map(m=>media(m)).join('')}</div>` : '';
+        const table = part.table ? renderers.matrix({...part.table,heading:part.heading || sec.heading}) : '';
+        const comparison = part.compare ? `<div class="article-comparison">${compare(part.compare)}</div>` : '';
+        const audio = part.audioItems ? renderers.layers({items:part.audioItems}) : '';
+        const bullets = part.bullets ? `<ul class="article-list">${part.bullets.map(item=>`<li>${text(item)}</li>`).join('')}</ul>` : '';
+        const note = part.note ? `<aside class="article-note">${part.note.label ? `<h4>${text(part.note.label)}</h4>` : ''}${paragraphs(part.note.body)}</aside>` : '';
+        return `<div class="article-part">${heading}${prose}${steps}${mediaItems}${table}${comparison}${audio}${bullets}${note}</div>`;
+      }).join('');
+    },
     "live-demo"(s) {
       if (!filled(s.url)) return "";
       return `<div class="live-demo">
@@ -301,7 +315,7 @@
     const id = `s-${idx}`;
     return `
       <section class="block${sec.wide ? " block--wide" : ""}" aria-labelledby="${id}">
-        <h2 class="block__title" id="${id}"><span class="block__index">${String(idx+3).padStart(2,'0')}</span>${esc(sec.heading || "")}</h2>
+        <h2 class="block__title" id="${id}"><span class="block__index">${String(idx+1).padStart(2,'0')}</span>${esc(sec.heading || "")}</h2>
         <div class="block__body">${sec.collapsible ? `<details class="additional-work"><summary>${esc(sec.toggleLabel || "추가 작업 보기")}</summary><div class="additional-work__body">${body}</div></details>` : body}</div>
       </section>`;
   }
@@ -396,38 +410,29 @@
   }
 
   function projectArticle(p) {
-    const meta = (p.meta || [])
-      .map((m) => ({ ...m, html: text(m.value) }))
-      .filter((m) => m.html)
-      .map((m) => `<div><dt>${esc(m.label)}</dt><dd>${m.html}</dd></div>`)
-      .join("");
-
     const outcome=p.outcome || {};
-    const brief=(p.brief || []).map(item=>`<div><dt>${esc(item.label)}</dt><dd>${text(item.value)}</dd></div>`).join('');
+    const resume=(p.resume || []).map(item=>`<div class="resume-item"><h3>${esc(item.heading)}</h3>${paragraphs(item.body)}</div>`).join('');
     const action=outcome.action ? `<a class="btn result-action" href="${esc(outcome.action.url)}" target="_blank" rel="noopener">${esc(outcome.action.label)}${ICON_ARROW}${NEW_TAB}</a>` : '';
-    return `      <article class="project">
+    const chapters=(p.sections || []).filter(visible);
+    return `      <article class="project project--blog">
         <header class="project__head">
+          <p class="project__eyebrow">${esc(p.articleLabel || 'AI 콘텐츠 제작 · 프로젝트 기록')}</p>
           <h1 class="project__title" id="project-title" tabindex="-1">${esc(p.title)}</h1>
         </header>
         <section class="project-summary" aria-labelledby="summary-title">
-          <h2 class="project-section-title" id="summary-title"><span class="block__index">01</span>요약 설명</h2>
-          <div class="summary-card">
-            <p class="summary-card__lead">${text(p.lead) || esc(p.summary)}</p>
-            <dl class="summary-brief">${brief}</dl>
-            <p class="summary-focus"><span>핵심 설계</span><span class="summary-focus__value">${text(p.focus)}</span></p>
-            ${meta ? `<dl class="project__meta">${meta}</dl>` : ''}
+          <h2 class="project-section-title" id="summary-title">프로젝트 요약</h2>
+          <div class="project-resume">${resume}</div>
+          <div class="summary-result">
+            <h3>결과물</h3>
+            <p>${text(outcome.body)}</p>
+            <div class="summary-result__media">${(outcome.media || []).map(m=>media(m,{hero:true})).join('')}</div>
+            ${action}${outcome.note ? `<p class="result-note">${text(outcome.note)}</p>` : ''}
           </div>
         </section>
-        <section class="project-result" aria-labelledby="result-title">
-          <h2 class="project-section-title" id="result-title"><span class="block__index">02</span>결과물</h2>
-          <div class="result-grid">
-            <div class="result-grid__media">${(outcome.media || []).map(m=>media(m,{hero:true})).join('')}</div>
-            <div class="result-grid__info"><h3>${text(outcome.title)}</h3><p>${text(outcome.body)}</p>
-              <ul class="result-points">${(outcome.points || []).map(point=>`<li><span>${text(point)}</span></li>`).join('')}</ul>
-              ${action}${outcome.note ? `<p class="result-note">${text(outcome.note)}</p>` : ''}
-            </div>
-          </div>
-        </section>
+        <nav class="article-toc" aria-label="상세 제작기 목차">
+          <h2>상세 제작기</h2>
+          <ol>${chapters.map((sec,i)=>`<li><a href="#s-${(p.sections || []).indexOf(sec)}"><span>${String(i+1).padStart(2,'0')}</span>${esc(sec.heading)}</a></li>`).join('')}</ol>
+        </nav>
         ${(p.sections || []).map(section).join("")}
       </article>`;
   }
@@ -505,6 +510,14 @@
       e.preventDefault(); openProject(p, anchor);
     });
     close.addEventListener('click', closeProject);
+    scroll.addEventListener('click', e => {
+      const link=e.target.closest('.article-toc a');
+      if(!link)return;
+      const heading=scroll.querySelector(link.getAttribute('href'));
+      if(!heading)return;
+      e.preventDefault();
+      heading.scrollIntoView({behavior:reduceMotion.matches?'auto':'smooth',block:'start'});
+    });
     dialog.addEventListener('cancel', e => {e.preventDefault(); closeProject();});
     dialog.addEventListener('click', e => {if (e.target === dialog) {
       const r=dialog.getBoundingClientRect();
