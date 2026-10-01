@@ -121,7 +121,7 @@ GitHub 웹 업로드는 파일당 25MB, git 푸시는 100MB가 한도입니다.
 - Hero 카드: WebGL 렌즈. 프로젝트 이미지 텍스처를 곡면 법선과 굴절률(1.333)에 따라 재샘플링합니다. DOM 전체를 캡처하거나 전체 화면을 굴절시키지 않습니다.
 - 상단 이름 링크·서비스 체험 CTA·팝업 닫기·다른 작업 링크: 공통 `.glass-control`. 본문 텍스트 위에 효과를 씌우지 않고, 글자 아래의 얇은 재질 레이어에서 처리합니다.
 - 팝업: 투명감을 주는 테두리만 적용하고 읽기 영역은 흰 배경으로 유지합니다.
-- 도입부: 5.32초 유지. 가까운 물방울 사이에 짧은 액체 연결부를 그린 뒤 분리합니다. 이는 제한된 2D 메타볼 스타일 연결이며 유체 시뮬레이션은 아닙니다.
+- 도입부: 5.32초 유지. 같은 셰이더 안에서 본체와 작은 방울을 부드럽게 연결하고, 연결부가 가늘어지며 분리·재결합하도록 표현합니다. 아래 메타볼 개선 항목을 참고합니다.
 
 ### 기술·동작
 - WebGL: `refract()`로 렌즈 확대·가장자리 왜곡, 표면 잔물결, 커서 방향 반사광을 계산합니다. Hover 시 굴절 강도를 높이고, 누르면 가로로 늘어나고 세로로 눌리는 변형을 적용합니다.
@@ -133,7 +133,18 @@ GitHub 웹 업로드는 파일당 25MB, git 푸시는 100MB가 한도입니다.
 ### 유지보수
 - `assets/js/wave-gallery.js`: Hero 렌즈·광원·변형.
 - `assets/js/glass-controls.js`: 작은 버튼의 변위 맵·상호작용·필터 수명 관리. 새 UI는 `initGlassControls(root)`로 초기화합니다.
-- `assets/js/liquid-intro.js`: 로고에서 카드로 이어지는 타임라인·짧은 연결부.
+- `assets/js/liquid-intro.js`: 로고에서 카드로 이어지는 타임라인·출렁임·작은 방울의 분리 및 재결합.
 - `assets/css/style.css`: 공통 재질·모바일·접근성 대체 스타일.
 - 검증: Chrome 데스크톱/모바일 에뮬레이션, 실제 배경 굴절 전후 비교, 반복 팝업 필터 정리, WebGL 미지원 및 모션 감소 경로. Safari/iOS 실기기 검증은 수행하지 않았습니다.
 - 구현 참고: [MDN backdrop-filter](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/backdrop-filter), [MDN feDisplacementMap](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Element/feDisplacementMap).
+
+
+## 2026-10-02 물방울 분리·재결합 모션
+
+- 기존 SVG 연결부를 제거하고, 각 카드의 WebGL 표면에서 본체와 작은 방울 3개를 하나의 거리장으로 계산합니다. Polynomial smooth union으로 연결부가 늘어나고 가늘어지다가 끊어지는 메타볼 효과를 만듭니다.
+- 작은 방울은 원래 CJ 형태의 윤곽 안에서 시작해 곡선 궤적으로 분리된 뒤 다시 합쳐집니다. 불투명도 전환으로 방울을 나타내는 대신 표면 자체를 연결·분리합니다. 작은 방울에도 자체 곡면과 굴절·반사광이 적용됩니다.
+- 큰 출렁임과 잔물결을 윤곽·표면 법선·가로세로 변형에 함께 반영하고, 단단한 물체처럼 보이던 회전은 줄였습니다. 기존 5.32초 타임라인과 프로젝트 카드로 이어지는 연속 변형은 유지합니다.
+- 캔버스 가장자리 여백을 늘려 튀는 방울을 수용하고, 렌더 해상도 상한을 조정해 픽셀 처리량의 증가를 제한합니다. 추가 방울 계산은 도입부에만 활성화하며, 캔버스 수는 3개를 유지합니다.
+- 이는 제한된 영역의 셰이더 기반 유체 모션입니다. 전체 화면 유체 시뮬레이션이나 3D ray marching은 사용하지 않습니다. 모션 감소 설정·WebGL 미지원 경로는 가벼운 대체 화면을 유지합니다.
+- 기술 조사: [Codrops — Interactive Droplet-Like Metaballs](https://tympanus.net/codrops/2025/06/09/how-to-create-interactive-droplet-like-metaballs-with-three-js-and-glsl/)의 거리장·smooth union 접근을 참고했습니다. [NVIDIA GPU Gems — Fast Fluid Dynamics Simulation on the GPU](https://developer.nvidia.com/gpugems/gpugems/part-vi-beyond-triangles/chapter-38-fast-fluid-dynamics-simulation-gpu)의 격자 기반 유체 방식도 검토했으나, 이 사이트에는 범위와 성능을 고려해 적용하지 않았습니다.
+- 검증: Chrome 데스크톱·320/390px 모바일 에뮬레이션, 도입 시간, 셰이더 컴파일, 프로젝트 팝업과 결과물 영상, 모션 감소·WebGL 대체 화면. Safari/iOS 실기기 검증은 수행하지 않았습니다.

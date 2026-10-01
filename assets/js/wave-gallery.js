@@ -47,7 +47,8 @@ window.initWaveGallery = function(root) {
     varying vec2 v_uv;
     uniform sampler2D u_shape,u_image;
     uniform vec3 u_color;
-    uniform float u_morph,u_reveal,u_time,u_wave,u_pixel,u_energy,u_light,u_lens,u_hover;
+    uniform float u_morph,u_reveal,u_time,u_wave,u_pixel,u_energy,u_light,u_lens,u_hover,u_slosh,u_clock;
+    uniform vec3 u_drops[3];
     uniform vec2 u_pointer,u_velocity;
     const float PI=3.14159265359;
     float radius(vec2 p){
@@ -56,23 +57,47 @@ window.initWaveGallery = function(root) {
       float petal=(encoded.r*65280.+encoded.g*255.)/65535.;
       float flow=.023*sin(angle*2.+u_time*1.35)+.013*sin(angle*3.-u_time*.95)+.006*sin(angle*5.+u_time*1.8);
       flow+=clamp(dot(u_velocity,vec2(cos(angle),sin(angle)))*.00065,-.012,.012);
-      return mix(petal,.48,u_morph)+flow*u_wave*mix(.3,1.,u_morph);
+      // Damped capillary modes: broad slosh plus a smaller, faster surface ripple.
+      float slosh=u_slosh*(.047*sin(angle*2.-u_clock*6.4)+.023*sin(angle*3.+u_clock*8.2));
+      return mix(petal,.48,u_morph)+flow*u_wave*mix(.3,1.,u_morph)+slosh;
+    }
+    // The main lobe and satellites share ONE field and one optical surface.
+    // Smooth distance blending creates a neck that pinches off, rather than fading particles in.
+    vec4 fluidField(vec2 p){
+      float r=radius(p);
+      vec4 field=vec4(length(p)-r,p/max(r,.001),r);
+      if(u_slosh>.001){
+        for(int i=0;i<3;i++){
+          vec3 drop=u_drops[i];
+          if(drop.z>.001){
+            vec2 local=p-drop.xy;
+            vec4 bead=vec4(length(local)-drop.z,local/drop.z,drop.z);
+            float k=.07;
+            float h=clamp(.5+.5*(bead.x-field.x)/k,0.,1.);
+            float d=mix(bead.x,field.x,h)-k*h*(1.-h);
+            field=vec4(d,mix(bead.yzw,field.yzw,h));
+          }
+        }
+      }
+      return field;
     }
     void main(){
-      vec2 p=(v_uv-.5)*1.44;p.y=-p.y;
-      float r=radius(p),distance=length(p)-r;
+      vec2 p=(v_uv-.5)*1.76;p.y=-p.y;
+      vec4 field=fluidField(p);
+      float r=field.w,distance=field.x;
       float mask=1.-smoothstep(-u_pixel,u_pixel,distance);
       // Water casts a soft, shallow shadow rather than a heavy solid-object shadow.
       vec2 shadowPoint=p-vec2(0.,.017);
-      float sd=length(shadowPoint)-radius(shadowPoint);
+      float sd=fluidField(shadowPoint).x;
       float shadow=.055*exp(-max(0.,sd)*62.)*max(u_reveal,u_energy);
       if(mask<.001&&shadow<.002){gl_FragColor=vec4(0.);return;}
-      vec2 curved=p/max(r,.001);
-      float rho=length(curved),depth=sqrt(max(.015,1.-rho*rho));
+      float rho=clamp(1.+distance/max(r,.001),0.,1.4);
+      vec2 curved=field.yz/max(length(field.yz),.001)*rho;
+      float depth=sqrt(max(.015,1.-rho*rho));
       float t=u_time*2.1;
       // Travelling capillary waves alter both refraction and reflections across the surface.
       vec2 ripple=vec2(cos(curved.x*9.+curved.y*4.-t),sin(curved.y*10.-curved.x*3.+t*.83));
-      ripple*=.035*u_wave*smoothstep(.1,.8,rho);
+      ripple*=(.035*u_wave+.024*u_slosh)*smoothstep(.1,.8,rho);
       vec3 normal=normalize(vec3(curved.x+ripple.x,-curved.y+ripple.y,depth));
       float rim=pow(1.-max(0.,normal.z),3.);
       // Snell refraction through a convex water lens (n ≈ 1.333).
@@ -85,7 +110,7 @@ window.initWaveGallery = function(root) {
       vec3 image=texture2D(u_image,uv).rgb;
       // Coloured, translucent water: dense at the rim, clear through the centre.
       vec3 liquid=mix(vec3(.97,.99,1.),u_color,.12+.63*smoothstep(.18,.96,rho));
-      vec3 color=mix(liquid,image,u_reveal);
+      vec3 color=mix(liquid,image,u_reveal*smoothstep(.10,.24,r));
       float waterEdge=smoothstep(.80,.98,rho);
       color=mix(color,vec3(.91,.96,.99),waterEdge*(.20+.08*u_energy));
       // Curved reflection streaks follow the travelling wave instead of spherical diffuse shading.
@@ -123,7 +148,7 @@ window.initWaveGallery = function(root) {
       const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
       gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
       const attribute=gl.getAttribLocation(program,'a_position');gl.enableVertexAttribArray(attribute);gl.vertexAttribPointer(attribute,2,gl.FLOAT,false,0,0);
-      const uniforms=Object.fromEntries(['shape','image','color','morph','reveal','time','wave','pixel','pointer','velocity','energy','light','lens','hover'].map(name=>[name,gl.getUniformLocation(program,'u_'+name)]));
+      const uniforms=Object.fromEntries(['shape','image','color','morph','reveal','time','wave','pixel','pointer','velocity','energy','light','lens','hover','slosh','clock','drops[0]'].map(name=>[name,gl.getUniformLocation(program,'u_'+name)]));
       function texture(unit) {
         const t=gl.createTexture();gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,t);
         gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
@@ -132,21 +157,23 @@ window.initWaveGallery = function(root) {
       texture(0);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1024,1,0,gl.RGBA,gl.UNSIGNED_BYTE,radiusMap(p.shape.points));gl.uniform1i(uniforms.shape,0);
       const imageTexture=texture(1);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([243,242,238,255]));gl.uniform1i(uniforms.image,1);
       const color=petal.color.match(/\w\w/g).map(v=>parseInt(v,16)/255);gl.uniform3f(uniforms.color,...color);
-      let usable=true,ready=false,state={morph:1,reveal:1,wave:0,energy:0,light:0,time:0};
+      let usable=true,ready=false,emptyDrops=new Float32Array(9),state={morph:1,reveal:1,wave:0,energy:0,light:0,time:0,slosh:0,drops:emptyDrops};
       function draw() {
         if(!usable)return;
         gl.uniform1f(uniforms.morph,state.morph);gl.uniform1f(uniforms.reveal,ready?state.reveal:0);
         gl.uniform1f(uniforms.time,(state.time ?? elapsed)*.38+p.index*2.1);gl.uniform1f(uniforms.wave,state.wave);
         gl.uniform1f(uniforms.lens,(coarse.matches?.08:.14)*(reduce.matches?.65:1)*(1+p.hover*.6-p.press*.25));gl.uniform1f(uniforms.hover,p.hover);
+        gl.uniform1f(uniforms.slosh,state.slosh);gl.uniform1f(uniforms.clock,state.time||0);
+        gl.uniform3fv(uniforms['drops[0]'],state.drops);
         gl.uniform1f(uniforms.energy,state.energy);gl.uniform1f(uniforms.light,state.light);
         gl.uniform2f(uniforms.pointer,p.x,p.y);gl.uniform2f(uniforms.velocity,p.vx,p.vy);
         gl.drawArrays(gl.TRIANGLES,0,6);
       }
       function resize(width) {
-        const pixels=Math.round(width*1.44*Math.min(devicePixelRatio||1,coarse.matches?1.25:1.5));
+        const pixels=Math.round(width*1.76*Math.min(devicePixelRatio||1,coarse.matches?1:1.25));
         if(canvas.width===pixels)return;
         canvas.width=canvas.height=Math.max(1,pixels);gl.viewport(0,0,canvas.width,canvas.height);
-        gl.uniform1f(uniforms.pixel,1.44/canvas.width*1.1);draw();
+        gl.uniform1f(uniforms.pixel,1.76/canvas.width*1.1);draw();
       }
       function upload() {
         if(!usable||!img.naturalWidth)return;
@@ -160,14 +187,14 @@ window.initWaveGallery = function(root) {
       if(img.complete)upload();else img.addEventListener('load',upload,{once:true});
       canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();usable=false;p.fallback=true;canvas.remove();p.frame.classList.remove('liquid-ready');});
       p.frame.append(canvas);p.surface=canvas;
-      return {render(morph,reveal,wave,lighting={}){state={morph,reveal,wave,energy:lighting.energy||0,light:lighting.light||0,time:lighting.time};draw();},resize};
+      return {render(morph,reveal,wave,lighting={}){state={morph,reveal,wave,energy:lighting.energy||0,light:lighting.light||0,time:lighting.time,slosh:lighting.slosh||0,drops:lighting.drops||emptyDrops};draw();},resize};
     } catch (_) {gl.getExtension('WEBGL_lose_context')?.loseContext();return null;}
   }
 
   // Browsers without WebGL retain a light SVG morph and compositor-only idle movement.
   function svgSurface(p,img,petal) {
     const svg=document.createElementNS(ns,'svg'),id=`liquid-fallback-${p.index}`;
-    svg.classList.add('liquid-surface');svg.setAttribute('viewBox','-.72 -.72 1.44 1.44');svg.setAttribute('aria-hidden','true');
+    svg.classList.add('liquid-surface');svg.setAttribute('viewBox','-.88 -.88 1.76 1.76');svg.setAttribute('aria-hidden','true');
     svg.innerHTML=`<defs><path id="${id}"/><clipPath id="${id}-clip"><use href="#${id}"/></clipPath></defs><g clip-path="url(#${id}-clip)"><rect x="-.6" y="-.6" width="1.2" height="1.2" fill="${petal.color}"/><image x="-.5" y="-.5" width="1" height="1" preserveAspectRatio="xMidYMid slice" href="${img.currentSrc||img.src}"/></g><use href="#${id}" fill="none" stroke="#fff" stroke-width=".007" stroke-opacity=".5"/>`;
     const path=svg.querySelector('path'),image=svg.querySelector('image');let previous='';
     p.frame.append(svg);p.surface=svg;
