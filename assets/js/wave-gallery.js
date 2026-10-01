@@ -47,7 +47,7 @@ window.initWaveGallery = function(root) {
     varying vec2 v_uv;
     uniform sampler2D u_shape,u_image;
     uniform vec3 u_color;
-    uniform float u_morph,u_reveal,u_time,u_wave,u_pixel,u_energy,u_light;
+    uniform float u_morph,u_reveal,u_time,u_wave,u_pixel,u_energy,u_light,u_lens,u_hover;
     uniform vec2 u_pointer,u_velocity;
     const float PI=3.14159265359;
     float radius(vec2 p){
@@ -75,22 +75,28 @@ window.initWaveGallery = function(root) {
       ripple*=.035*u_wave*smoothstep(.1,.8,rho);
       vec3 normal=normalize(vec3(curved.x+ripple.x,-curved.y+ripple.y,depth));
       float rim=pow(1.-max(0.,normal.z),3.);
-      vec2 uv=clamp(p+vec2(.5)+curved*.029*rim+ripple*.12,vec2(.001),vec2(.999));
+      // Snell refraction through a convex water lens (n ≈ 1.333).
+      // Sample the underlying project texture at the displaced ray, not a blurred copy.
+      vec3 lensNormal=normalize(vec3(curved*.72+ripple, .65+depth));
+      vec3 ray=refract(vec3(0.,0.,-1.),lensNormal,1./1.333);
+      float thickness=u_lens*(.45+.55*smoothstep(.15,.95,rho));
+      vec2 offset=ray.xy*thickness+u_pointer*.008*rim*(1.+u_hover);
+      vec2 uv=clamp(p+vec2(.5)+offset+ripple*.10,vec2(.001),vec2(.999));
       vec3 image=texture2D(u_image,uv).rgb;
       // Coloured, translucent water: dense at the rim, clear through the centre.
       vec3 liquid=mix(vec3(.97,.99,1.),u_color,.12+.63*smoothstep(.18,.96,rho));
       vec3 color=mix(liquid,image,u_reveal);
       float waterEdge=smoothstep(.80,.98,rho);
-      color=mix(color,vec3(.91,.96,.99),waterEdge*(.43+.1*u_energy));
+      color=mix(color,vec3(.91,.96,.99),waterEdge*(.20+.08*u_energy));
       // Curved reflection streaks follow the travelling wave instead of spherical diffuse shading.
       float angle=atan(curved.y,curved.x);
       float band=rho-(.81+.026*sin(angle*3.+t)*u_wave);
-      float crescent=exp(-band*band*1500.)*pow(max(0.,sin(angle+u_light*.18-.45)),5.);
+      float crescent=exp(-band*band*1500.)*pow(max(0.,sin(angle+u_light*.18-.45+u_pointer.x*.65-u_pointer.y*.4)),5.);
       float innerBand=rho-(.60+.045*sin(angle*2.-t*.65)*u_wave);
       float caustic=exp(-innerBand*innerBand*900.)*pow(max(0.,cos(angle+1.1)),8.);
-      vec3 light=normalize(vec3(-.5+sin(u_light)*.32*u_energy,.68,1.));
+      vec3 light=normalize(vec3(-.5+sin(u_light)*.32*u_energy+u_pointer.x*.85,.68-u_pointer.y*.85,1.));
       float sparkle=pow(max(0.,dot(normal,normalize(light+vec3(0.,0.,1.)))),100.);
-      color+=vec3(crescent*.5+caustic*.12+sparkle*.28);
+      color+=vec3(crescent*(.4+.16*u_hover)+caustic*.10+sparkle*(.23+.2*u_hover));
       // Thin dark/bright refraction bands define a clear meniscus on the white page.
       float innerEdge=exp(-pow((rho-.95)*65.,2.));
       color-=vec3(.045,.035,.025)*innerEdge;
@@ -117,7 +123,7 @@ window.initWaveGallery = function(root) {
       const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
       gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
       const attribute=gl.getAttribLocation(program,'a_position');gl.enableVertexAttribArray(attribute);gl.vertexAttribPointer(attribute,2,gl.FLOAT,false,0,0);
-      const uniforms=Object.fromEntries(['shape','image','color','morph','reveal','time','wave','pixel','pointer','velocity','energy','light'].map(name=>[name,gl.getUniformLocation(program,'u_'+name)]));
+      const uniforms=Object.fromEntries(['shape','image','color','morph','reveal','time','wave','pixel','pointer','velocity','energy','light','lens','hover'].map(name=>[name,gl.getUniformLocation(program,'u_'+name)]));
       function texture(unit) {
         const t=gl.createTexture();gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,t);
         gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
@@ -131,6 +137,7 @@ window.initWaveGallery = function(root) {
         if(!usable)return;
         gl.uniform1f(uniforms.morph,state.morph);gl.uniform1f(uniforms.reveal,ready?state.reveal:0);
         gl.uniform1f(uniforms.time,(state.time ?? elapsed)*.38+p.index*2.1);gl.uniform1f(uniforms.wave,state.wave);
+        gl.uniform1f(uniforms.lens,(coarse.matches?.08:.14)*(reduce.matches?.65:1)*(1+p.hover*.6-p.press*.25));gl.uniform1f(uniforms.hover,p.hover);
         gl.uniform1f(uniforms.energy,state.energy);gl.uniform1f(uniforms.light,state.light);
         gl.uniform2f(uniforms.pointer,p.x,p.y);gl.uniform2f(uniforms.velocity,p.vx,p.vy);
         gl.drawArrays(gl.TRIANGLES,0,6);
@@ -198,11 +205,11 @@ window.initWaveGallery = function(root) {
     const dt=Math.min(last?(time-last)/1000:1/60,1/30);last=time;elapsed+=dt;settle=Math.min(1,settle+dt*1.2);
     for(const p of planes) {
       if(!p.visible||p.fallback)continue;
-      spring(p,'x','vx',p.tx,dt);spring(p,'y','vy',p.ty,dt);spring(p,'hover','hv',p.target,dt,75,13);spring(p,'press','pv',p.pressed?1:0,dt,130,19);spring(p,'wobble','wv',0,dt,38,5.5);
+      spring(p,'x','vx',p.tx,dt,240,27);spring(p,'y','vy',p.ty,dt,240,27);spring(p,'hover','hv',p.target,dt,240,27);spring(p,'press','pv',p.pressed?1:0,dt,400,34);spring(p,'wobble','wv',0,dt,38,5.5);
       const motion=reduce.matches?0:1;
-      p.renderer.render(1,1,motion*settle*(1+p.hover*.22));
-      const size=1+p.hover*.045-p.press*.055,stretch=clamp(p.wobble,-.4,.4)*.1;
-      p.frame.style.transform=motion?`translate3d(${p.x*11}px,${p.y*9+Math.sin(elapsed*.42+p.index*2)*4*settle}px,0) rotateX(${-p.y*7}deg) rotateY(${p.x*8}deg) rotateZ(${p.wobble*4}deg) scale(${size*(1+stretch)},${size*(1-stretch)})`:'none';
+      p.renderer.render(1,1,motion*settle*(coarse.matches?.4:.65)*(1+p.hover*.35));
+      const size=1+p.hover*.025,stretch=clamp(p.wobble,-.4,.4)*.065+p.press*.045;
+      p.frame.style.transform=motion?`translate3d(${p.x*6}px,${p.y*5+Math.sin(elapsed*.42+p.index*2)*4*settle}px,0) rotateX(${-p.y*4}deg) rotateY(${p.x*5}deg) rotateZ(${p.wobble*4}deg) scale(${size*(1+stretch)},${size*(1-stretch)})`:'none';
     }
     if(!reduce.matches&&planes.some(p=>p.visible&&!p.fallback))raf=requestAnimationFrame(tick);
   }

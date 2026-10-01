@@ -406,6 +406,7 @@
     cardVideos();
     setupProjectModal();
     exclusivePlayback();
+    window.initGlassControls?.(document);
     window.initLiquidIntro?.(list);
   }
 
@@ -465,6 +466,7 @@
       dialog.classList.remove('is-revealed');
       document.body.classList.add('project-is-open');
       dialog.showModal(); scroll.scrollTop = 0;
+      window.initGlassControls?.(dialog);
       document.dispatchEvent(new CustomEvent('portfolio:modal', {detail: {open: true}}));
       document.title = `${p.title} | 최수호`;
       const d = duration();
@@ -493,7 +495,8 @@
       scroll.animate([{opacity:1},{opacity:0}], {duration:reduceMotion.matches?0:300,easing:'cubic-bezier(.4,0,.8,1)',fill:'forwards'});
       running = dialog.animate([{transform:'none',opacity:1},{transform:geometry(),borderRadius:'50%',opacity:0}], {duration:reduceMotion.matches?0:820,easing:'cubic-bezier(.5,0,.25,1)'});
       await running.finished.catch(() => {});
-      dialog.close(); scroll.innerHTML = ''; running = null; closing = false;
+      dialog.close(); scroll.innerHTML = '';
+      window.initGlassControls?.(document); running = null; closing = false;
       // Drop filled opacity animations before the next project is opened.
       scroll.getAnimations().forEach(a => a.cancel());
       cover.getAnimations().forEach(a => a.cancel());
@@ -566,6 +569,7 @@
 
     sliders();
     exclusivePlayback();
+    window.initGlassControls?.(document);
   }
 
   document.addEventListener("DOMContentLoaded", () => {

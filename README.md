@@ -114,3 +114,26 @@ GitHub 웹 업로드는 파일당 25MB, git 푸시는 100MB가 한도입니다.
 - 메인 카드에서 원작 플랫폼 표시를 제거하고, 제목과 설명 사이에 프로젝트별 핵심 역량 3개를 해시태그로 표시합니다. 상세페이지의 출처 정보는 유지합니다.
 - 불투명한 구형 명암을 투명한 색, 가장자리 굴절, 얇은 수면 반사광으로 교체했습니다. 표면과 윤곽의 잔물결, 이동 중 늘어남과 복원으로 물의 유동성을 표현합니다.
 - 도입 타임라인을 6.65초에서 5.32초로 20% 단축했습니다. 텍스트 등장도 함께 비례 조정합니다.
+
+## 2026-10-02 Liquid Glass 재질 시스템
+
+### 적용 범위
+- Hero 카드: WebGL 렌즈. 프로젝트 이미지 텍스처를 곡면 법선과 굴절률(1.333)에 따라 재샘플링합니다. DOM 전체를 캡처하거나 전체 화면을 굴절시키지 않습니다.
+- 상단 이름 링크·서비스 체험 CTA·팝업 닫기·다른 작업 링크: 공통 `.glass-control`. 본문 텍스트 위에 효과를 씌우지 않고, 글자 아래의 얇은 재질 레이어에서 처리합니다.
+- 팝업: 투명감을 주는 테두리만 적용하고 읽기 영역은 흰 배경으로 유지합니다.
+- 도입부: 5.32초 유지. 가까운 물방울 사이에 짧은 액체 연결부를 그린 뒤 분리합니다. 이는 제한된 2D 메타볼 스타일 연결이며 유체 시뮬레이션은 아닙니다.
+
+### 기술·동작
+- WebGL: `refract()`로 렌즈 확대·가장자리 왜곡, 표면 잔물결, 커서 방향 반사광을 계산합니다. Hover 시 굴절 강도를 높이고, 누르면 가로로 늘어나고 세로로 눌리는 변형을 적용합니다.
+- SVG: 데스크톱 Chromium의 작은 버튼에만 캡슐형 변위 맵 + `feDisplacementMap`을 `backdrop-filter`로 적용합니다. 버튼마다 크기 변경 시에만 맵을 만들고, 동적 CTA가 사라지면 관련 필터를 정리합니다.
+- CSS: 투명 그라데이션·베젤·얕은 그림자·180~220ms 반응을 공통 재질로 사용합니다. Safari/iOS와 터치 환경의 작은 버튼에는 CSS 대체 효과를 사용합니다.
+- WebGL 미지원은 SVG 이미지 카드, `prefers-reduced-motion`은 정적 렌즈와 변형 없는 버튼, 고대비 설정에서는 불투명 버튼으로 대체합니다.
+- Hero 캔버스 3개와 제한 해상도를 유지합니다. 화면 밖·탭 비활성화·팝업 열람 중에는 Hero 렌더링을 중단합니다. 작은 버튼의 커서 추적은 입력이 있을 때만 실행됩니다.
+
+### 유지보수
+- `assets/js/wave-gallery.js`: Hero 렌즈·광원·변형.
+- `assets/js/glass-controls.js`: 작은 버튼의 변위 맵·상호작용·필터 수명 관리. 새 UI는 `initGlassControls(root)`로 초기화합니다.
+- `assets/js/liquid-intro.js`: 로고에서 카드로 이어지는 타임라인·짧은 연결부.
+- `assets/css/style.css`: 공통 재질·모바일·접근성 대체 스타일.
+- 검증: Chrome 데스크톱/모바일 에뮬레이션, 실제 배경 굴절 전후 비교, 반복 팝업 필터 정리, WebGL 미지원 및 모션 감소 경로. Safari/iOS 실기기 검증은 수행하지 않았습니다.
+- 구현 참고: [MDN backdrop-filter](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/backdrop-filter), [MDN feDisplacementMap](https://developer.mozilla.org/en-US/docs/Web/SVG/Reference/Element/feDisplacementMap).
