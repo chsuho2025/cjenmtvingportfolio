@@ -13,33 +13,22 @@ window.initLiquidIntro=function(gallery){
   const scale=Math.min(4.1,(innerWidth-90)/79),center={x:innerWidth/2,y:innerHeight*.43};
   brand.style.cssText=`left:${center.x-28.5*scale}px;top:${center.y-33.5*scale}px;width:${57*scale}px;height:${67*scale}px`;
   const targets=engine.planes.map(p=>{const r=p.frame.getBoundingClientRect();p.restLight=[innerWidth*.18-r.left-r.width/2,r.top+r.height/2-innerHeight*.10,650];return {p,r};});
-  // Fixed screen-space light, transformed into each rotating surface's coordinates.
-  function localLight(x,y,z,rx,ry,rz){
-    let v=[innerWidth*.18-x,y-innerHeight*.10,650-z];
-    const rot=(a,b,t)=>{const c=Math.cos(t),s=Math.sin(t),u=v[a],w=v[b];v[a]=c*u-s*w;v[b]=s*u+c*w;};
-    rot(0,2,-ry);rot(1,2,rx);rot(0,1,rz);
-    const n=Math.hypot(...v);return v.map(q=>q/n);
-  }
   let raf=0,start=performance.now(),done=false,text=false,handedOff=false;
   function frame(seconds){
-    if(seconds>=.85&&!handedOff){handedOff=true;paths.forEach(p=>p.style.visibility='hidden');targets.forEach(({p})=>p.surface.style.visibility='');}
+    if(seconds>=.3&&!handedOff){handedOff=true;paths.forEach(p=>p.style.visibility='hidden');targets.forEach(({p})=>p.surface.style.visibility='');}
     if(!handedOff)targets.forEach(({p})=>p.surface.style.visibility='hidden');
-    const turn=ease((seconds-.85)/4.6),spin=turn*Math.PI*2;
-    const material=ease((seconds-.85)/1.25);
+    const material=ease((seconds-.3)/1.9);
     targets.forEach(({p,r},i)=>{
-      const move=ease((seconds-2.05-i*.10)/4.1);
-      const morph=ease((seconds-2.65-i*.10)/3.15),reveal=ease((seconds-3.35-i*.10)/2.35);
-      const arc=Math.sin(Math.PI*turn),room=Math.min(1,innerWidth/900);
-      const dx=(p.shape.cx-50.5)*scale,dy=(p.shape.cy-33.5)*scale;
-      const sx=center.x+dx*Math.cos(spin)-dy*Math.sin(spin),sy=center.y+dx*Math.sin(spin)+dy*Math.cos(spin);
-      const x=lerp(sx,r.left+r.width/2,move),y=lerp(sy,r.top+r.height/2,move)-Math.sin(Math.PI*move)*30*room;
-      const depth=arc*[48,-32,36][i]*room;
-      const rx=arc*Math.sin(spin+i*.6)*.42,ry=arc*Math.cos(spin+i*.8)*.48,rz=spin;
-      const size=lerp(p.shape.size*scale,r.width,move),deg=180/Math.PI;
-      // Rotation changes the highlights. The light position itself never circles the logo.
-      engine.update(p,{morph,reveal,energy:material*(1-move),material,time:seconds,wave:move*.12,
-        lightDir:localLight(x,y,depth,rx,ry,rz),
-        transform:`perspective(1000px) translate3d(${x-r.left-r.width/2}px,${y-r.top-r.height/2}px,${depth}px) rotateY(${ry*deg}deg) rotateX(${rx*deg}deg) rotateZ(${rz*deg}deg) scale(${size/r.width})`});
+      const move=ease((seconds-.3-i*.045)/4.65);
+      // Position and silhouette share one progress value: no orbit or rotating card.
+      const morph=move,reveal=ease((move-.30)/.64);
+      const sx=center.x+(p.shape.cx-50.5)*scale,sy=center.y+(p.shape.cy-33.5)*scale;
+      const x=lerp(sx,r.left+r.width/2,move),y=lerp(sy,r.top+r.height/2,move);
+      const size=lerp(p.shape.size*scale,r.width,move);
+      const stretch=Math.sin(Math.PI*move)*.035;
+      engine.update(p,{morph,reveal,energy:material*(1-move),material,time:seconds,wave:Math.sin(Math.PI*move)*.2,
+        lightDir:[innerWidth*.18-x,y-innerHeight*.10,650],
+        transform:`translate3d(${x-r.left-r.width/2}px,${y-r.top-r.height/2}px,0) scale(${size/r.width*(1+stretch)},${size/r.width*(1-stretch*.6)})`});
     });
   }
   function finish(){if(done)return;done=true;cancelAnimationFrame(raf);clearTimeout(safety);frame(7.2);engine.finish();gallery.inert=false;html.classList.remove('has-liquid-intro','intro-text-in');marker.remove();brand.remove();document.removeEventListener('keydown',key);document.removeEventListener('visibilitychange',visibility);window.removeEventListener('resize',finish);}
