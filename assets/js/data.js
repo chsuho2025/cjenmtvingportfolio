@@ -83,11 +83,11 @@ window.PORTFOLIO = {
           "type": "live-demo",
           "wide": true,
           "heading": "직접 체험하기",
-          "url": "https://antiframe.vercel.app/dashboard",
-          "title": "Antiframe 실제 서비스 대시보드",
-          "label": "새 탭에서 서비스 열기",
+          "url": "https://antiframe.vercel.app/generate",
+          "title": "Antiframe 영상 제작",
+          "label": "가입 없이 영상 만들기",
           "status": "",
-          "note": "서비스 화면은 바로 확인할 수 있습니다. 영상 제작은 로그인 후 계정별 이용 한도 내에서 가능합니다."
+          "note": "가입 없이 무료 체험 한도 내에서 영상을 제작할 수 있습니다. 새 탭에서 주제와 대본을 입력해 시작해 보세요."
         }
       ]
     },

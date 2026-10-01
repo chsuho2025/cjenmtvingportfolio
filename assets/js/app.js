@@ -153,7 +153,6 @@
       return `<div class="live-demo">
         ${s.status ? `<p class="live-demo__status">${esc(s.status)}</p>` : ""}
         <div class="live-demo__toolbar"><a class="btn" href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.label)}${ICON_ARROW}${NEW_TAB}</a></div>
-        <iframe class="live-demo__frame" src="${esc(s.url)}" title="${esc(s.title)}" loading="lazy" allow="fullscreen" allowfullscreen></iframe>
         <p class="live-demo__note">${esc(s.note || "")}</p>
       </div>`;
     },
