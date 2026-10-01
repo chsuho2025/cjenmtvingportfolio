@@ -115,7 +115,7 @@
           <div class="card__caption">
             ${mini ? "" : `<span class="card__number">${String(i + 1).padStart(2, "0")}</span>`}
             <span class="card__title">${cardTitle}</span>
-            ${p.platform ? `<span class="card__platform">${esc(p.platform)}</span>` : ""}
+            ${p.tags?.length ? `<span class="card__tags" aria-label="핵심 역량">${p.tags.map(tag=>`<span>#${esc(tag)}</span>`).join('')}</span>` : ""}
             <span class="card__summary">${esc(p.summary)}</span>
             ${mini ? "" : `<span class="card__competency"><span class="sr-only">핵심 역량: </span>${esc(p.competency)}</span>`}
 

@@ -54,43 +54,51 @@ window.initWaveGallery = function(root) {
       float angle=atan(p.y,p.x);
       vec2 encoded=texture2D(u_shape,vec2(angle/(2.*PI)+.5,.5)).rg;
       float petal=(encoded.r*65280.+encoded.g*255.)/65535.;
-      float flow=.014*sin(angle*2.+u_time)+.010*sin(angle*3.-u_time*.7);
+      float flow=.023*sin(angle*2.+u_time*1.35)+.013*sin(angle*3.-u_time*.95)+.006*sin(angle*5.+u_time*1.8);
       flow+=clamp(dot(u_velocity,vec2(cos(angle),sin(angle)))*.00065,-.012,.012);
-      return mix(petal,.48+flow*u_wave,u_morph);
+      return mix(petal,.48,u_morph)+flow*u_wave*mix(.3,1.,u_morph);
     }
     void main(){
       vec2 p=(v_uv-.5)*1.44;p.y=-p.y;
       float r=radius(p),distance=length(p)-r;
       float mask=1.-smoothstep(-u_pixel,u_pixel,distance);
-      vec2 shadowPoint=p-vec2(0.,.035);
+      // Water casts a soft, shallow shadow rather than a heavy solid-object shadow.
+      vec2 shadowPoint=p-vec2(0.,.017);
       float sd=length(shadowPoint)-radius(shadowPoint);
-      float shadow=(.16+.1*u_energy)*exp(-max(0.,sd)*(46.-u_energy*12.))*max(u_reveal,u_energy);
+      float shadow=.055*exp(-max(0.,sd)*62.)*max(u_reveal,u_energy);
       if(mask<.001&&shadow<.002){gl_FragColor=vec4(0.);return;}
       vec2 curved=p/max(r,.001);
-      vec3 normal=normalize(vec3(curved.x,-curved.y,sqrt(max(.035,1.-dot(curved,curved)))));
-      // Bounded optical distortion: retain legible thumbnail centres as the glass settles.
-      vec2 uv=clamp(p+vec2(.5)+curved*.009*u_energy*(1.-normal.z),vec2(0.),vec2(1.));
-      vec3 base=mix(u_color,texture2D(u_image,uv).rgb,u_reveal);
-      vec3 light=normalize(vec3(-.48+u_pointer.x*.18+sin(u_light)*.8*u_energy,
-        .65-u_pointer.y*.18+cos(u_light)*.36*u_energy,1.));
-      float diffuse=max(0.,dot(normal,light));
+      float rho=length(curved),depth=sqrt(max(.015,1.-rho*rho));
+      float t=u_time*2.1;
+      // Travelling capillary waves alter both refraction and reflections across the surface.
+      vec2 ripple=vec2(cos(curved.x*9.+curved.y*4.-t),sin(curved.y*10.-curved.x*3.+t*.83));
+      ripple*=.035*u_wave*smoothstep(.1,.8,rho);
+      vec3 normal=normalize(vec3(curved.x+ripple.x,-curved.y+ripple.y,depth));
       float rim=pow(1.-max(0.,normal.z),3.);
-      float specular=pow(max(0.,dot(normal,normalize(light+vec3(0.,0.,1.)))),28.);
-      // Two moving softbox reflections make the rounded surface readable without extra layers.
-      vec3 reflection=reflect(vec3(0.,0.,-1.),normal);
-      float ribbon=exp(-pow((reflection.x*.8+reflection.y*.25-sin(u_light)*.55)*6.,2.));
-      ribbon*=smoothstep(-.6,.8,reflection.y)*u_energy;
-      float glint=pow(max(0.,dot(normal,normalize(vec3(.75,-.25,1.)))),58.)*u_energy;
-      vec3 tint=mix(vec3(.7,.86,1.),vec3(1.,.88,.72),.5+.5*sin(u_light));
-      vec3 shaded=base*(.76+.24*diffuse-.12*u_energy*(1.-diffuse));
-      shaded+=vec3((.17+.4*u_energy)*specular+.1*rim)+vec3(.24*ribbon+.26*glint);
-      shaded+=tint*rim*.2*u_energy;
-      // Begin at the exact coloured blossom; become polished volumes before the image reveal.
-      vec3 color=mix(base,shaded,max(u_reveal,u_energy));
-      float edge=(1.-smoothstep(0.,.009,abs(distance)))*(.4*u_reveal+.22*u_energy);
+      vec2 uv=clamp(p+vec2(.5)+curved*.029*rim+ripple*.12,vec2(.001),vec2(.999));
+      vec3 image=texture2D(u_image,uv).rgb;
+      // Coloured, translucent water: dense at the rim, clear through the centre.
+      vec3 liquid=mix(vec3(.97,.99,1.),u_color,.12+.63*smoothstep(.18,.96,rho));
+      vec3 color=mix(liquid,image,u_reveal);
+      float waterEdge=smoothstep(.80,.98,rho);
+      color=mix(color,vec3(.91,.96,.99),waterEdge*(.43+.1*u_energy));
+      // Curved reflection streaks follow the travelling wave instead of spherical diffuse shading.
+      float angle=atan(curved.y,curved.x);
+      float band=rho-(.81+.026*sin(angle*3.+t)*u_wave);
+      float crescent=exp(-band*band*1500.)*pow(max(0.,sin(angle+u_light*.18-.45)),5.);
+      float innerBand=rho-(.60+.045*sin(angle*2.-t*.65)*u_wave);
+      float caustic=exp(-innerBand*innerBand*900.)*pow(max(0.,cos(angle+1.1)),8.);
+      vec3 light=normalize(vec3(-.5+sin(u_light)*.32*u_energy,.68,1.));
+      float sparkle=pow(max(0.,dot(normal,normalize(light+vec3(0.,0.,1.)))),100.);
+      color+=vec3(crescent*.5+caustic*.12+sparkle*.28);
+      // Thin dark/bright refraction bands define a clear meniscus on the white page.
+      float innerEdge=exp(-pow((rho-.95)*65.,2.));
+      color-=vec3(.045,.035,.025)*innerEdge;
+      float edge=(1.-smoothstep(0.,.007,abs(distance)))*.65;
       color=mix(color,vec3(1.),edge);
-      float alpha=mask+shadow*(1.-mask);
-      gl_FragColor=vec4(color*mask+vec3(.13,.16,.18)*shadow*(1.-mask),alpha);
+      float transparency=mix(.9,1.,u_reveal)*(1.-.12*waterEdge);
+      float fill=mask*transparency,alpha=fill+shadow*(1.-mask);
+      gl_FragColor=vec4(color*fill+vec3(.36,.48,.54)*shadow*(1.-mask),alpha);
     }`;
 
   function gpuSurface(p,img,petal) {

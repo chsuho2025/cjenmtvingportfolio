@@ -593,3 +593,9 @@ button { font: inherit; }
  .project-lead-media { padding-top:66px; }
  .project-lead-media + .project__head { padding-top:26px !important; }
 }
+
+/* Concise competency tags sit between the project title and its description. */
+.card__tags { display:flex; flex-wrap:wrap; gap:4px 10px; margin:9px 0 11px; color:#426575; font-size:12px; font-weight:500; line-height:1.7; }
+.card__tags > span { white-space:nowrap; }
+.has-liquid-intro .site-header, .has-liquid-intro .home__title, .has-liquid-intro .card__caption { transition-duration:.88s,1.04s; }
+.has-liquid-intro.intro-text-in .card__caption { transition-delay:calc(144ms + var(--i) * 88ms); }

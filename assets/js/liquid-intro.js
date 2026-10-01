@@ -9,7 +9,7 @@ window.initLiquidIntro=function(gallery){
   const lerp=(a,b,t)=>a+(b-a)*t;
   const scale=Math.min(4.5,(innerWidth-100)/56),center={x:innerWidth/2,y:innerHeight*.43};
   const targets=engine.planes.map(p=>({p,r:p.frame.getBoundingClientRect()}));
-  let raf=0,start=0,done=false,text=false;
+  let raf=0,start=performance.now(),done=false,text=false;
   function frame(seconds){
     targets.forEach(({p,r},i)=>{
       const travel=clamp((seconds-1.2-i*.12)/4.65),move=ease(travel);
@@ -21,13 +21,13 @@ window.initLiquidIntro=function(gallery){
       const direction=[-1,1,.6][i],room=Math.min(1,innerWidth/900);
       const x=lerp(sx,r.left+r.width/2,move)+arc*direction*52*room;
       const y=lerp(sy,r.top+r.height/2,move)-arc*(52+i*16)*room;
-      const depth=arc*[95,-72,62][i]*room;
-      const roll=arc*[-24,27,19][i]+Math.sin(move*Math.PI*2)*arc*9;
-      const pitch=arc*Math.sin(move*Math.PI*1.5+i*.65)*28;
-      const yaw=arc*direction*42;
+      const depth=arc*[62,-45,42][i]*room;
+      const roll=arc*[-12,14,10][i]+Math.sin(move*Math.PI*2)*arc*7;
+      const pitch=arc*Math.sin(move*Math.PI*1.5+i*.65)*18;
+      const yaw=arc*direction*26;
       const size=lerp(p.shape.size*scale*bloom,r.width,move);
-      const stretch=arc*.065;
-      engine.update(p,{morph,reveal,energy,light:seconds*1.3+i*1.7,time:seconds,wave:arc*.7,
+      const stretch=arc*(.10+Math.sin(seconds*4.2+i*1.7)*.045);
+      engine.update(p,{morph,reveal,energy,light:seconds*1.3+i*1.7,time:seconds,wave:arc*1.2,
         transform:`perspective(1000px) translate3d(${x-r.left-r.width/2}px,${y-r.top-r.height/2}px,${depth}px) rotateX(${pitch}deg) rotateY(${yaw}deg) rotateZ(${roll}deg) scale(${size/r.width*(1+stretch)},${size/r.width*(1-stretch)})`});
     });
   }
@@ -35,6 +35,6 @@ window.initLiquidIntro=function(gallery){
   function key(e){if(e.key==='Escape'||e.key==='Tab')finish();}function visibility(){if(document.hidden)finish();}
   const safety=setTimeout(finish,9000);document.addEventListener('keydown',key);document.addEventListener('visibilitychange',visibility);window.addEventListener('resize',finish,{once:true});
   frame(0);
-  function tick(now){if(done)return;if(!start)start=now;const time=(now-start)/1000;frame(time);if(time>4.5&&!text){text=true;html.classList.add('intro-text-in');}if(time>=6.65){finish();return;}raf=requestAnimationFrame(tick);}
+  function tick(now){if(done)return;const time=Math.max(0,now-start)/1000/.8;frame(time);if(time>4.5&&!text){text=true;html.classList.add('intro-text-in');}if(time>=6.65){finish();return;}raf=requestAnimationFrame(tick);}
   raf=requestAnimationFrame(tick);
 };
