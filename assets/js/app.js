@@ -30,7 +30,7 @@
   // 문구: 채워진 값은 그대로, 자리표시자는 작업 모드에서만 표시
   const text = (v) => {
     if (isPH(v)) return SHOW_PH ? `<span class="ph-text"><span class="sr-only">자리표시자: </span>${esc(v.placeholder)}</span>` : "";
-    return filled(v) ? esc(v) : "";
+    return filled(v) ? esc(v).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/==([^=]+)==/g, '<mark>$1</mark>').replace(/__([^_]+)__/g, '<u>$1</u>') : "";
   };
 
   const ICON_ARROW =
@@ -115,6 +115,7 @@
           <div class="card__caption">
             ${mini ? "" : `<span class="card__number">${String(i + 1).padStart(2, "0")}</span>`}
             <span class="card__title">${cardTitle}</span>
+            ${p.platform ? `<span class="card__platform">${esc(p.platform)}</span>` : ""}
             <span class="card__summary">${esc(p.summary)}</span>
             ${mini ? "" : `<span class="card__competency"><span class="sr-only">핵심 역량: </span>${esc(p.competency)}</span>`}
 
@@ -438,8 +439,8 @@
         { transform: 'scale(1.025, .985)', borderRadius: '70px', opacity: 1, offset: .72 },
         { transform: 'none', borderRadius: '42px', opacity: 1 }
       ], {duration:d, easing:'cubic-bezier(.22,.85,.18,1)'});
-      cover.animate([{opacity:1},{opacity:1,offset:.3},{opacity:0}], {duration:d,fill:'forwards'});
-      scroll.animate([{opacity:0, transform:'translateY(36px)'},{opacity:0,offset:.36},{opacity:1,transform:'none'}], {duration:d});
+      cover.animate([{opacity:1},{opacity:1,offset:.3},{opacity:0}], {duration:d,easing:'cubic-bezier(.16,1,.3,1)',fill:'forwards'});
+      scroll.animate([{opacity:0, transform:'translateY(36px)'},{opacity:0,offset:.36},{opacity:1,transform:'none'}], {duration:d,easing:'cubic-bezier(.22,.7,.2,1)'});
       running.finished.then(() => {
         running = null; opening = false;
         dialog.classList.add('is-revealed');
@@ -454,8 +455,8 @@
       // Removing embedded players also stops playback in cross-origin frames.
       scroll.querySelectorAll('iframe').forEach(el => el.remove());
       dialog.classList.remove('is-revealed');
-      cover.animate([{opacity:0},{opacity:1}], {duration:reduceMotion.matches?0:220,fill:'forwards'});
-      scroll.animate([{opacity:1},{opacity:0}], {duration:reduceMotion.matches?0:160,fill:'forwards'});
+      cover.animate([{opacity:0},{opacity:1}], {duration:reduceMotion.matches?0:220,easing:'cubic-bezier(.16,1,.3,1)',fill:'forwards'});
+      scroll.animate([{opacity:1},{opacity:0}], {duration:reduceMotion.matches?0:160,easing:'cubic-bezier(.4,0,.8,1)',fill:'forwards'});
       running = dialog.animate([{transform:'none',opacity:1},{transform:geometry(),borderRadius:'50%',opacity:0}], {duration:reduceMotion.matches?0:540,easing:'cubic-bezier(.5,0,.25,1)'});
       await running.finished.catch(() => {});
       dialog.close(); scroll.innerHTML = ''; running = null; closing = false;

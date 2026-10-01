@@ -1,148 +1,74 @@
-/* Liquid portrait cards: soft circular silhouettes with independent surface tension.
-   No external animation dependency. HTML images and links remain the fallback. */
-window.initWaveGallery = function(root, options = {}) {
-  const reduce = matchMedia('(prefers-reduced-motion: reduce)');
-  const desktop = matchMedia('(hover: hover) and (pointer: fine)');
-  const toggle = document.querySelector('.motion-toggle');
-  let enabled = options.enabled !== false;
-  // Motion follows system accessibility preferences; no extra UI controls.
-  let active = false, visible = true, modalOpen = false, introPlaying = false, raf = 0, last = 0, elapsed = 0;
-  const pointer = {x:0,y:0,tx:0,ty:0,energy:0};
-  const vertex = `
-    precision mediump float;
-    attribute vec2 a_uv;
-    uniform float u_time, u_index, u_hover, u_energy;
-    uniform vec2 u_pointer;
-    varying vec2 v_uv;
-    void main() {
-      v_uv = a_uv;
-      float phase = u_time * .83 + u_index * 2.1;
-      vec2 p = (a_uv - .5) * 1.88;
-      p *= 1.0 + .055 * u_hover;
-      p.y += sin(phase) * .035;
-      p.x += cos(phase * .73) * .022;
-      p += vec2(u_pointer.x, -u_pointer.y) * .026 * u_hover;
-      gl_Position = vec4(p, 0.0, 1.0);
-    }`;
-  const fragment = `
-    precision mediump float;
-    uniform sampler2D u_image;
-    uniform vec2 u_crop, u_offset;
-    uniform float u_time, u_index, u_hover, u_energy;
-    varying vec2 v_uv;
-    void main() {
-      vec2 center = v_uv - .5;
-      float angle = atan(center.y, center.x);
-      float phase = u_time * .83 + u_index * 2.1;
-      float strength = 1.0 + .32 * u_hover + .18 * u_energy;
-      // Low-order waves preserve a rounded droplet rather than a wavy rectangle.
-      float contour = (.022 * sin(2.0 * angle + phase)
-                     + .014 * sin(3.0 * angle - phase * .81)
-                     + .005 * cos(5.0 * angle + phase * .57)) * strength;
-      float radius = .44 + contour;
-      float r = length(center);
-      float distance = r - radius;
-      float alpha = 1.0 - smoothstep(-.002, .001, distance);
-      // A restrained lens at the rim; the work itself stays readable.
-      float radial = clamp(r / radius, 0.0, 1.0);
-      vec2 lens = .5 + center * (.976 + .024 * radial * radial);
-      vec2 uv = lens * u_crop + u_offset;
-      vec4 color = texture2D(u_image, uv);
-      float rim = smoothstep(.92, 1.0, radial);
-      float light = .5 + .5 * dot(normalize(center + vec2(.0001)), normalize(vec2(-.65, .8)));
-      vec3 rgb = color.rgb * (1.0 - rim * .045 * (1.0 - light));
-      rgb = mix(rgb, vec3(1.0), rim * .12 * light);
-      gl_FragColor = vec4(rgb, color.a * alpha);
-    }`;
-  function makePlane(card,index) {
-    const img = card.querySelector('.card__img');
-    if (!img || img.tagName !== 'IMG') return null;
-    const frame=card.querySelector('.card__frame'), canvas=document.createElement('canvas');
-    canvas.className='wave-canvas'; canvas.setAttribute('aria-hidden','true');
-    const gl=canvas.getContext('webgl',{alpha:true,antialias:true,powerPreference:'low-power',premultipliedAlpha:false});
-    if (!gl) return null;
-    function shader(type,source){const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));return s;}
-    let program;
-    try {
-      program=gl.createProgram(); const vs=shader(gl.VERTEX_SHADER,vertex), fs=shader(gl.FRAGMENT_SHADER,fragment);
-      gl.attachShader(program,vs);gl.attachShader(program,fs);gl.linkProgram(program);
-      gl.deleteShader(vs);gl.deleteShader(fs);
-      if(!gl.getProgramParameter(program,gl.LINK_STATUS))return null;
-    } catch(_){ return null; }
-    gl.useProgram(program);
-    const points=[], nx=48,ny=24;
-    for(let y=0;y<ny;y++)for(let x=0;x<nx;x++){
-      const a=x/nx,b=y/ny,c=(x+1)/nx,d=(y+1)/ny;
-      points.push(a,b,c,b,a,d,a,d,c,b,c,d);
-    }
-    const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(points),gl.STATIC_DRAW);
-    const attr=gl.getAttribLocation(program,'a_uv');gl.enableVertexAttribArray(attr);gl.vertexAttribPointer(attr,2,gl.FLOAT,false,0,0);
-    const uniforms=Object.fromEntries(['time','index','hover','energy','pointer','crop','offset','image'].map(k=>[k,gl.getUniformLocation(program,'u_'+k)]));
-    const texture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,texture);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
-    const plane={card,frame,canvas,gl,program,uniforms,ready:false,lost:false,hover:0,target:0,count:points.length/2,index};
-    function upload(){
-      if(!img.naturalWidth || plane.lost)return;
-      try {
-        gl.bindTexture(gl.TEXTURE_2D,texture);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,img);
-        const aspect=img.naturalWidth/img.naturalHeight;
-        const crop=aspect>1?[1/aspect,1]:[1,aspect];
-        const pos=(img.style.objectPosition||'50% 50%').split(' ').map(x=>parseFloat(x)/100);
-        plane.crop=crop;plane.offset=[(1-crop[0])*(pos[0]||.5),(1-crop[1])*(1-(pos[1]||.5))];
-        plane.ready=true;sync();
-      }catch(_){plane.ready=false;}
-    }
-    frame.appendChild(canvas);
-    canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();plane.lost=true;plane.ready=false;frame.classList.remove('wave-ready');sync();});
-    canvas.addEventListener('webglcontextrestored',()=>{ /* HTML fallback is retained until next page load. */ });
-    card.addEventListener('pointerenter',()=>{plane.target=1;kick();});
-    card.addEventListener('pointerleave',()=>{plane.target=0;kick();});
-    card.addEventListener('focus',()=>{plane.target=1;kick();});
-    card.addEventListener('blur',()=>{plane.target=0;kick();});
-    img.addEventListener('load',upload);queueMicrotask(upload);
-    return plane;
+/* One persistent liquid surface for the logo, card, and pointer interaction. */
+window.initWaveGallery = function(root) {
+  const ns='http://www.w3.org/2000/svg', reduce=matchMedia('(prefers-reduced-motion: reduce)');
+  // Blossom geometry and colors: https://prd-cdn.cj.net/static/svg/logo_b.svg
+  const paths=[
+    {color:'#006ECD',d:'M28.9737 25.1752C36.092 30.0361 44.0627 31.5075 46.8915 28.3543C49.7421 25.1752 48.758 15.8919 44.8255 7.47599C40.8931 -.939936 32.9889 -2.48874 26.8752 4.32816C20.8374 11.141 21.8786 20.3252 28.9737 25.1752Z'},
+    {color:'#FF9700',d:'M69.8469 22.6178C61.8232 19.455 53.7209 19.793 51.6671 23.4947C49.5916 27.2275 52.6173 36.0629 58.3184 43.3997C64.0195 50.7365 72.0812 50.4949 76.5267 42.4834C80.903 34.4992 77.8488 25.7683 69.8469 22.6178Z'},
+    {color:'#EF151E',d:'M31.2926 50.8411C34.9291 42.2894 41.18 35.3504 45.449 35.3477C49.6841 35.3477 53.9192 42.2555 55.0622 50.8031C56.2011 59.3276 50.0588 66.2423 40.9519 66.3047C31.7921 66.3142 27.6629 59.3819 31.2926 50.8411Z'}
+  ];
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  function sample(d){
+    const svg=document.createElementNS(ns,'svg'),path=document.createElementNS(ns,'path');path.setAttribute('d',d);svg.append(path);svg.style.cssText='position:absolute;width:0;height:0;visibility:hidden';document.body.append(svg);
+    const b=path.getBBox(),length=path.getTotalLength(),size=Math.max(b.width,b.height),cx=b.x+b.width/2,cy=b.y+b.height/2;
+    const points=Array.from({length:64},(_,i)=>{const p=path.getPointAtLength(i/64*length);return [(p.x-cx)/size,(p.y-cy)/size];});svg.remove();
+    const area=points.reduce((n,p,i)=>{const q=points[(i+1)%64];return n+p[0]*q[1]-q[0]*p[1];},0);
+    return {points,b,size,cx,cy,angle:Math.atan2(points[0][1],points[0][0]),direction:Math.sign(area)};
   }
-  const planes=[...root.querySelectorAll('.card')].map(makePlane).filter(Boolean);
-  function draw(p){
-    const gl=p.gl, r=p.frame.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,desktop.matches?2:1.5);
-    const size=Math.round(r.width*1.12*dpr);
-    if(p.canvas.width!==size){p.canvas.width=size;p.canvas.height=size;gl.viewport(0,0,size,size);}
-    gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);gl.useProgram(p.program);
-    gl.uniform1f(p.uniforms.time,elapsed);gl.uniform1f(p.uniforms.index,p.index);
-    gl.uniform1f(p.uniforms.hover,p.hover);gl.uniform1f(p.uniforms.energy,pointer.energy);
-    gl.uniform2f(p.uniforms.pointer,pointer.x,pointer.y);
-    gl.uniform2fv(p.uniforms.crop,p.crop);gl.uniform2fv(p.uniforms.offset,p.offset);
-    gl.drawArrays(gl.TRIANGLES,0,p.count);
+  function closed(points){
+    let d=`M${points[0].join(' ')}`;
+    for(let i=0;i<points.length;i++){const a=points[(i+63)%64],b=points[i],c=points[(i+1)%64],e=points[(i+2)%64];d+=`C${b[0]+(c[0]-a[0])/6} ${b[1]+(c[1]-a[1])/6} ${c[0]-(e[0]-b[0])/6} ${c[1]-(e[1]-b[1])/6} ${c.join(' ')}`;}
+    return d+'Z';
   }
-  function tick(time){
-    raf=0;if(!active||document.hidden||!visible||modalOpen||introPlaying)return;
-    const dt=Math.min(last?(time-last)/1000:1/60,.05);last=time;elapsed+=dt;
-    const smooth=1-Math.exp(-dt*5);
-    pointer.x+=(pointer.tx-pointer.x)*smooth;pointer.y+=(pointer.ty-pointer.y)*smooth;pointer.energy*=Math.exp(-dt*2.5);
-    for(const p of planes){if(!p.ready)continue;p.hover+=(p.target-p.hover)*smooth;draw(p);}
-    raf=requestAnimationFrame(tick);
-  }
-  function kick(){if(active&&!raf&&!document.hidden&&visible&&!modalOpen&&!introPlaying){last=0;raf=requestAnimationFrame(tick);}}
-  function sync(){
-    const supported=planes.some(p=>p.ready);
-    active=enabled&&!reduce.matches&&supported;
-    root.classList.toggle('is-wave',active);
-    planes.forEach(p=>p.frame.classList.toggle('wave-ready',active&&p.ready));
-    if(toggle){toggle.disabled=reduce.matches||!supported;toggle.setAttribute('aria-pressed',String(active));toggle.textContent=active?'모션 켜짐':'모션 꺼짐';}
-    if(active)kick();else{cancelAnimationFrame(raf);raf=0;last=0;}
-  }
-  root.closest('.home').addEventListener('pointermove',e=>{
-    if(!active)return;const r=root.getBoundingClientRect();const x=Math.max(-1,Math.min(1,(e.clientX-r.left)/r.width*2-1));
-    pointer.energy=Math.min(1,pointer.energy+Math.abs(x-pointer.tx)*.9);pointer.tx=x;pointer.ty=Math.max(-1,Math.min(1,(e.clientY-r.top)/r.height*2-1));
+  const planes=[...root.querySelectorAll('.card')].map((card,i)=>{
+    const frame=card.querySelector('.card__frame'),img=card.querySelector('.card__img'),shape=sample(paths[i].d),id=`liquid-${i}`;
+    const svg=document.createElementNS(ns,'svg');svg.classList.add('liquid-surface');svg.setAttribute('viewBox','-.72 -.72 1.44 1.44');svg.setAttribute('aria-hidden','true');
+    svg.innerHTML=`<defs>
+      <path id="${id}-shape"/><clipPath id="${id}-clip" clipPathUnits="userSpaceOnUse"><use href="#${id}-shape"/></clipPath>
+      <radialGradient id="${id}-depth" cx="36%" cy="25%" r="78%"><stop offset="0" stop-color="#fff" stop-opacity=".13"/><stop offset=".6" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#132231" stop-opacity=".32"/></radialGradient>
+      <radialGradient id="${id}-shine" cx="28%" cy="18%" r="70%"><stop offset="0" stop-color="#fff" stop-opacity=".75"/><stop offset=".2" stop-color="#fff" stop-opacity=".24"/><stop offset=".58" stop-color="#fff" stop-opacity="0"/></radialGradient>
+      <filter id="${id}-shadow" x="-60%" y="-60%" width="220%" height="240%"><feDropShadow dx="0" dy=".035" stdDeviation=".027" flood-color="#17222e" flood-opacity=".18"/></filter>
+    </defs>
+    <use href="#${id}-shape" class="liquid-shadow" filter="url(#${id}-shadow)" fill="#fff"/>
+    <g clip-path="url(#${id}-clip)"><use href="#${id}-shape" class="liquid-color" fill="${paths[i].color}"/>
+    <image class="liquid-image" x="-.5" y="-.5" width="1" height="1" preserveAspectRatio="xMidYMid slice" href="${img.currentSrc||img.src}"/>
+    <use href="#${id}-shape" class="liquid-depth" fill="url(#${id}-depth)"/><use href="#${id}-shape" class="liquid-shine" fill="url(#${id}-shine)"/>
+    <ellipse class="liquid-reflection" cx="-.17" cy="-.32" rx=".19" ry=".026" fill="#fff" opacity=".34" transform="rotate(-28)"/>
+    </g><use href="#${id}-shape" class="liquid-rim" fill="none" stroke="#fff" stroke-width=".007" stroke-opacity=".52"/>`;
+    frame.append(svg);frame.classList.add('liquid-ready');
+    const p={card,frame,svg,shape,index:i,hover:0,hv:0,target:0,x:0,y:0,vx:0,vy:0,tx:0,ty:0,pressed:false,press:0,pv:0};
+    p.geometry=[svg.querySelector(`#${id}-shape`)];p.color=svg.querySelector('.liquid-color');p.depth=svg.querySelector('.liquid-depth');p.image=svg.querySelector('image');p.shine=svg.querySelector('.liquid-shine');p.reflection=svg.querySelector('.liquid-reflection');
+    card.addEventListener('pointerenter',()=>p.target=1);card.addEventListener('pointerleave',()=>{p.target=0;p.tx=p.ty=0;p.pressed=false;});
+    card.addEventListener('pointermove',e=>{if(intro)return;const r=card.getBoundingClientRect();p.tx=clamp((e.clientX-r.left)/r.width*2-1,-1,1);p.ty=clamp((e.clientY-r.top)/Math.min(r.height,r.width)*2-1,-1,1);});
+    card.addEventListener('pointerdown',()=>p.pressed=true);card.addEventListener('pointerup',()=>p.pressed=false);card.addEventListener('pointercancel',()=>p.pressed=false);
+    card.addEventListener('focus',()=>p.target=1);card.addEventListener('blur',()=>{p.target=0;p.tx=p.ty=0;});
+    return p;
   });
-  root.addEventListener('pointerleave',()=>{pointer.tx=pointer.ty=0;});
-  toggle?.addEventListener('click',()=>{enabled=!enabled;try{localStorage.setItem('portfolio-motion',enabled?'on':'off');}catch(_){}sync();});
-  [reduce,desktop].forEach(q=>q.addEventListener('change',sync));
-  document.addEventListener('portfolio:intro',e=>{introPlaying=!!e.detail.playing;if(introPlaying){cancelAnimationFrame(raf);raf=0;}else{pointer.energy=1;kick();}});
-  document.addEventListener('portfolio:modal',e=>{modalOpen=!!e.detail.open;if(modalOpen){cancelAnimationFrame(raf);raf=0;}else kick();});
-  document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelAnimationFrame(raf);raf=0;}else kick();});
-  const observer=new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;if(visible)kick();else{cancelAnimationFrame(raf);raf=0;}},{rootMargin:'80px'});observer.observe(root);
-  sync();
+  let raf=0,last=0,elapsed=0,intro=false,modal=false,settle=1;
+  function geometry(p,morph,wave=0){
+    const points=p.shape.points.map((point,j)=>{
+      const a=p.shape.angle+p.shape.direction*j/64*Math.PI*2;
+      const phase=elapsed*.85+p.index*2.1;
+      const directional=(p.vx*Math.cos(a)+p.vy*Math.sin(a))*.00065;
+      const radius=.48+wave*(.018*Math.sin(a*2+phase)+.012*Math.sin(a*3-phase*.7)+clamp(directional,-.018,.018));
+      return [point[0]*(1-morph)+Math.cos(a)*radius*morph,point[1]*(1-morph)+Math.sin(a)*radius*morph];
+    });
+    const d=closed(points);p.geometry.forEach(el=>el.setAttribute('d',d));
+  }
+  function surface(p,reveal){p.image.setAttribute('opacity',reveal);p.color.setAttribute('opacity',1-reveal);p.depth.setAttribute('opacity',reveal*.8);p.shine.setAttribute('opacity',reveal*.75);p.reflection.setAttribute('opacity',reveal*.25);}
+  function spring(p,key,velocity,target,dt,stiffness=170,damping=17){p[velocity]+=(stiffness*(target-p[key])-damping*p[velocity])*dt;p[key]+=p[velocity]*dt;}
+  function tick(time){
+    raf=0;if(document.hidden||modal)return;const dt=Math.min(last?(time-last)/1000:1/60,1/30);last=time;
+    if(!intro){elapsed+=dt;settle=Math.min(1,settle+dt*2.4);for(const p of planes){spring(p,'x','vx',p.tx,dt);spring(p,'y','vy',p.ty,dt);spring(p,'hover','hv',p.target,dt,190,19);spring(p,'press','pv',p.pressed?1:0,dt,230,18);
+      const motion=reduce.matches?0:1;geometry(p,1,motion*settle*(1+p.hover*.22));surface(p,1);
+      p.frame.style.transform=motion?`translate3d(${p.x*8}px,${p.y*7+Math.sin(elapsed*.9+p.index*2)*4*settle}px,0) rotateX(${-p.y*8}deg) rotateY(${p.x*9}deg) scale(${1+p.hover*.035-p.press*.06})`:'none';
+      p.shine.setAttribute('transform',`translate(${p.x*.06} ${p.y*.045})`);p.reflection.setAttribute('transform',`translate(${p.x*.08} ${p.y*.04}) rotate(${-28+p.x*12})`);
+    }}
+    if(!reduce.matches||intro)raf=requestAnimationFrame(tick);
+  }
+  function kick(){if(!raf&&!document.hidden&&!modal){last=0;raf=requestAnimationFrame(tick);}}
+  root.liquidCards={planes,begin(){intro=true;settle=0;},update(p,state){geometry(p,state.morph,0);surface(p,state.reveal);p.frame.style.transform=state.transform;},finish(){intro=false;settle=0;planes.forEach(p=>{p.frame.style.transform='none';geometry(p,1,0);surface(p,1);});kick();}};
+  planes.forEach(p=>{geometry(p,1,0);surface(p,1);});root.classList.add('is-liquid');
+  document.addEventListener('portfolio:modal',e=>{modal=!!e.detail.open;if(modal){cancelAnimationFrame(raf);raf=0;}else kick();});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelAnimationFrame(raf);raf=0;}else kick();});reduce.addEventListener('change',kick);kick();
 };
