@@ -47,7 +47,7 @@ window.initWaveGallery = function(root) {
     varying vec2 v_uv;
     uniform sampler2D u_shape,u_image;
     uniform vec3 u_color;
-    uniform float u_morph,u_reveal,u_time,u_wave,u_pixel;
+    uniform float u_morph,u_reveal,u_time,u_wave,u_pixel,u_energy,u_light;
     uniform vec2 u_pointer,u_velocity;
     const float PI=3.14159265359;
     float radius(vec2 p){
@@ -64,20 +64,30 @@ window.initWaveGallery = function(root) {
       float mask=1.-smoothstep(-u_pixel,u_pixel,distance);
       vec2 shadowPoint=p-vec2(0.,.035);
       float sd=length(shadowPoint)-radius(shadowPoint);
-      float shadow=.16*exp(-max(0.,sd)*46.)*u_reveal;
+      float shadow=(.16+.1*u_energy)*exp(-max(0.,sd)*(46.-u_energy*12.))*max(u_reveal,u_energy);
       if(mask<.001&&shadow<.002){gl_FragColor=vec4(0.);return;}
-      vec2 uv=clamp(p+vec2(.5),vec2(0.),vec2(1.));
-      vec3 base=mix(u_color,texture2D(u_image,uv).rgb,u_reveal);
       vec2 curved=p/max(r,.001);
       vec3 normal=normalize(vec3(curved.x,-curved.y,sqrt(max(.035,1.-dot(curved,curved)))));
-      vec3 light=normalize(vec3(-.48+u_pointer.x*.18,.65-u_pointer.y*.18,1.));
+      // Bounded optical distortion: retain legible thumbnail centres as the glass settles.
+      vec2 uv=clamp(p+vec2(.5)+curved*.009*u_energy*(1.-normal.z),vec2(0.),vec2(1.));
+      vec3 base=mix(u_color,texture2D(u_image,uv).rgb,u_reveal);
+      vec3 light=normalize(vec3(-.48+u_pointer.x*.18+sin(u_light)*.8*u_energy,
+        .65-u_pointer.y*.18+cos(u_light)*.36*u_energy,1.));
       float diffuse=max(0.,dot(normal,light));
       float rim=pow(1.-max(0.,normal.z),3.);
       float specular=pow(max(0.,dot(normal,normalize(light+vec3(0.,0.,1.)))),28.);
-      vec3 shaded=base*(.76+.24*diffuse)+vec3(.17*specular+.1*rim);
-      // Keep the opening blossom flat and its official colors intact.
-      vec3 color=mix(base,shaded,u_reveal);
-      float edge=(1.-smoothstep(0.,.009,abs(distance)))*.4*u_reveal;
+      // Two moving softbox reflections make the rounded surface readable without extra layers.
+      vec3 reflection=reflect(vec3(0.,0.,-1.),normal);
+      float ribbon=exp(-pow((reflection.x*.8+reflection.y*.25-sin(u_light)*.55)*6.,2.));
+      ribbon*=smoothstep(-.6,.8,reflection.y)*u_energy;
+      float glint=pow(max(0.,dot(normal,normalize(vec3(.75,-.25,1.)))),58.)*u_energy;
+      vec3 tint=mix(vec3(.7,.86,1.),vec3(1.,.88,.72),.5+.5*sin(u_light));
+      vec3 shaded=base*(.76+.24*diffuse-.12*u_energy*(1.-diffuse));
+      shaded+=vec3((.17+.4*u_energy)*specular+.1*rim)+vec3(.24*ribbon+.26*glint);
+      shaded+=tint*rim*.2*u_energy;
+      // Begin at the exact coloured blossom; become polished volumes before the image reveal.
+      vec3 color=mix(base,shaded,max(u_reveal,u_energy));
+      float edge=(1.-smoothstep(0.,.009,abs(distance)))*(.4*u_reveal+.22*u_energy);
       color=mix(color,vec3(1.),edge);
       float alpha=mask+shadow*(1.-mask);
       gl_FragColor=vec4(color*mask+vec3(.13,.16,.18)*shadow*(1.-mask),alpha);
@@ -99,7 +109,7 @@ window.initWaveGallery = function(root) {
       const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
       gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
       const attribute=gl.getAttribLocation(program,'a_position');gl.enableVertexAttribArray(attribute);gl.vertexAttribPointer(attribute,2,gl.FLOAT,false,0,0);
-      const uniforms=Object.fromEntries(['shape','image','color','morph','reveal','time','wave','pixel','pointer','velocity'].map(name=>[name,gl.getUniformLocation(program,'u_'+name)]));
+      const uniforms=Object.fromEntries(['shape','image','color','morph','reveal','time','wave','pixel','pointer','velocity','energy','light'].map(name=>[name,gl.getUniformLocation(program,'u_'+name)]));
       function texture(unit) {
         const t=gl.createTexture();gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,t);
         gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
@@ -108,11 +118,12 @@ window.initWaveGallery = function(root) {
       texture(0);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1024,1,0,gl.RGBA,gl.UNSIGNED_BYTE,radiusMap(p.shape.points));gl.uniform1i(uniforms.shape,0);
       const imageTexture=texture(1);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([243,242,238,255]));gl.uniform1i(uniforms.image,1);
       const color=petal.color.match(/\w\w/g).map(v=>parseInt(v,16)/255);gl.uniform3f(uniforms.color,...color);
-      let usable=true,ready=false,state={morph:1,reveal:1,wave:0};
+      let usable=true,ready=false,state={morph:1,reveal:1,wave:0,energy:0,light:0,time:0};
       function draw() {
         if(!usable)return;
         gl.uniform1f(uniforms.morph,state.morph);gl.uniform1f(uniforms.reveal,ready?state.reveal:0);
-        gl.uniform1f(uniforms.time,elapsed*.38+p.index*2.1);gl.uniform1f(uniforms.wave,state.wave);
+        gl.uniform1f(uniforms.time,(state.time ?? elapsed)*.38+p.index*2.1);gl.uniform1f(uniforms.wave,state.wave);
+        gl.uniform1f(uniforms.energy,state.energy);gl.uniform1f(uniforms.light,state.light);
         gl.uniform2f(uniforms.pointer,p.x,p.y);gl.uniform2f(uniforms.velocity,p.vx,p.vy);
         gl.drawArrays(gl.TRIANGLES,0,6);
       }
@@ -134,7 +145,7 @@ window.initWaveGallery = function(root) {
       if(img.complete)upload();else img.addEventListener('load',upload,{once:true});
       canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();usable=false;p.fallback=true;canvas.remove();p.frame.classList.remove('liquid-ready');});
       p.frame.append(canvas);p.surface=canvas;
-      return {render(morph,reveal,wave){state={morph,reveal,wave};draw();},resize};
+      return {render(morph,reveal,wave,lighting={}){state={morph,reveal,wave,energy:lighting.energy||0,light:lighting.light||0,time:lighting.time};draw();},resize};
     } catch (_) {gl.getExtension('WEBGL_lose_context')?.loseContext();return null;}
   }
 
@@ -196,7 +207,7 @@ window.initWaveGallery = function(root) {
   window.addEventListener('scroll',()=>planes.forEach(p=>p.bounds=null),{passive:true});
   root.liquidCards={planes,
     begin(){intro=true;settle=0;cancelAnimationFrame(raf);raf=0;},
-    update(p,state){p.renderer.render(state.morph,state.reveal,0);p.frame.style.transform=state.transform;},
+    update(p,state){p.renderer.render(state.morph,state.reveal,state.wave||0,state);p.frame.style.transform=state.transform;},
     finish(){intro=false;settle=0;planes.forEach(p=>{p.frame.style.transform='none';p.renderer.render(1,1,0);});kick();}
   };
   root.classList.add('is-liquid');

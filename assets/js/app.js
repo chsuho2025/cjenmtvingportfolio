@@ -46,7 +46,7 @@
   // 상세 페이지용: 원본 비율 유지, 잘림·늘림 없음
   function media(m, opts = {}) {
     if (!m || !filled(m.src)) return placeholderBox(m && m.label, m && m.aspect);
-    const r = ratio(m.aspect);
+    const r = ratio(opts.landscape ? "16/9" : m.aspect);
     const portrait = r.num < 1 ? " media--portrait" : "";
     const style = `--ar:${r.css};--arn:${r.num}`;
     const alt = esc(m.alt || "");
@@ -415,6 +415,7 @@
     const action=outcome.action ? `<a class="btn result-action" href="${esc(outcome.action.url)}" target="_blank" rel="noopener">${esc(outcome.action.label)}${ICON_ARROW}${NEW_TAB}</a>` : '';
     const chapters=(p.sections || []).filter(visible);
     return `      <article class="project project--blog">
+        <div class="project-lead-media" aria-label="프로젝트 결과물 영상">${(outcome.media || []).map(m=>media(m,{hero:true,landscape:true})).join('')}</div>
         <header class="project__head">
           <p class="project__eyebrow">${esc(p.articleLabel || 'AI 콘텐츠 제작 · 프로젝트 기록')}</p>
           <h1 class="project__title" id="project-title" tabindex="-1">${esc(p.title)}</h1>
@@ -425,7 +426,6 @@
           <div class="summary-result">
             <h3>결과물</h3>
             <p>${text(outcome.body)}</p>
-            <div class="summary-result__media">${(outcome.media || []).map(m=>media(m,{hero:true})).join('')}</div>
             ${action}${outcome.note ? `<p class="result-note">${text(outcome.note)}</p>` : ''}
           </div>
         </section>

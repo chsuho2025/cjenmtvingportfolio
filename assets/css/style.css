@@ -579,3 +579,17 @@ button { font: inherit; }
  .article-media .media { --media-max-h:520px; }
  .project--blog .layers { padding:0 18px; }
 }
+
+/* Lead with the finished work. Portrait footage is letterboxed, never cropped. */
+.project-lead-media { padding-top:72px; }
+.project-lead-media .media { width:100%; }
+.project-lead-media .media__box { aspect-ratio:16/9; background:#080a0d; }
+.project-lead-media .media__box > video { object-fit:contain; }
+.project-lead-media + .project__head { padding-top:32px !important; }
+.project-lead-media .media--embed { padding:0; border-radius:18px; }
+.has-liquid-intro .card { perspective:none; }
+.has-liquid-intro .card__frame { will-change:transform; }
+@media(max-width:720px) {
+ .project-lead-media { padding-top:66px; }
+ .project-lead-media + .project__head { padding-top:26px !important; }
+}
