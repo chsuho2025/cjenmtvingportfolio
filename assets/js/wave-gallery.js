@@ -112,7 +112,7 @@ window.initWaveGallery = function(root) {
       function draw() {
         if(!usable)return;
         gl.uniform1f(uniforms.morph,state.morph);gl.uniform1f(uniforms.reveal,ready?state.reveal:0);
-        gl.uniform1f(uniforms.time,elapsed*.85+p.index*2.1);gl.uniform1f(uniforms.wave,state.wave);
+        gl.uniform1f(uniforms.time,elapsed*.38+p.index*2.1);gl.uniform1f(uniforms.wave,state.wave);
         gl.uniform2f(uniforms.pointer,p.x,p.y);gl.uniform2f(uniforms.velocity,p.vx,p.vy);
         gl.drawArrays(gl.TRIANGLES,0,6);
       }
@@ -154,35 +154,36 @@ window.initWaveGallery = function(root) {
 
   const planes=[...root.querySelectorAll('.card')].map((card,index)=>{
     const frame=card.querySelector('.card__frame'),img=card.querySelector('.card__img');
-    const p={card,frame,index,shape:sample(petals[index].d),hover:0,hv:0,target:0,x:0,y:0,vx:0,vy:0,tx:0,ty:0,pressed:false,press:0,pv:0,visible:true,bounds:null};
+    const p={card,frame,index,shape:sample(petals[index].d),hover:0,hv:0,target:0,x:0,y:0,vx:0,vy:0,tx:0,ty:0,pressed:false,press:0,pv:0,wobble:0,wv:0,visible:true,bounds:null};
     p.renderer=gpuSurface(p,img,petals[index])||svgSurface(p,img,petals[index]);
     frame.classList.add('liquid-ready');
     const resize=new ResizeObserver(entries=>{p.renderer.resize(entries[0].contentRect.width);p.bounds=null;});resize.observe(frame);
-    function enter(){p.target=1;p.bounds=card.getBoundingClientRect();kick();}
+    function enter(){p.target=1;p.bounds=card.getBoundingClientRect();if(!reduce.matches&&!coarse.matches&&!intro)p.wv=2.8;kick();}
     card.addEventListener('pointerenter',enter);
-    card.addEventListener('pointerleave',()=>{p.target=0;p.tx=p.ty=0;p.pressed=false;});
+    card.addEventListener('pointerleave',()=>{p.target=0;p.tx=p.ty=0;p.pressed=false;if(!reduce.matches&&!coarse.matches)p.wv-=1.2;});
     card.addEventListener('pointermove',e=>{
       if(intro||reduce.matches||coarse.matches)return;
       const r=p.bounds||(p.bounds=card.getBoundingClientRect());
       p.tx=clamp((e.clientX-r.left)/r.width*2-1,-1,1);p.ty=clamp((e.clientY-r.top)/Math.min(r.height,r.width)*2-1,-1,1);
     });
-    card.addEventListener('pointerdown',()=>{p.pressed=true;kick();});card.addEventListener('pointerup',()=>p.pressed=false);card.addEventListener('pointercancel',()=>p.pressed=false);
+    card.addEventListener('pointerdown',()=>{p.pressed=true;kick();});card.addEventListener('pointerup',()=>{p.pressed=false;if(!reduce.matches)p.wv=1.8;});card.addEventListener('pointercancel',()=>p.pressed=false);
     card.addEventListener('focus',enter);card.addEventListener('blur',()=>{p.target=0;p.tx=p.ty=0;});
     p.renderer.resize(frame.getBoundingClientRect().width);p.renderer.render(1,1,0);return p;
   });
 
-  function spring(p,key,velocity,target,dt,stiffness=170,damping=17) {
+  function spring(p,key,velocity,target,dt,stiffness=65,damping=14) {
     p[velocity]+=(stiffness*(target-p[key])-damping*p[velocity])*dt;p[key]+=p[velocity]*dt;
   }
   function tick(time) {
     raf=0;if(document.hidden||modal||intro)return;
-    const dt=Math.min(last?(time-last)/1000:1/60,1/30);last=time;elapsed+=dt;settle=Math.min(1,settle+dt*2.4);
+    const dt=Math.min(last?(time-last)/1000:1/60,1/30);last=time;elapsed+=dt;settle=Math.min(1,settle+dt*1.2);
     for(const p of planes) {
       if(!p.visible||p.fallback)continue;
-      spring(p,'x','vx',p.tx,dt);spring(p,'y','vy',p.ty,dt);spring(p,'hover','hv',p.target,dt,190,19);spring(p,'press','pv',p.pressed?1:0,dt,230,18);
+      spring(p,'x','vx',p.tx,dt);spring(p,'y','vy',p.ty,dt);spring(p,'hover','hv',p.target,dt,75,13);spring(p,'press','pv',p.pressed?1:0,dt,130,19);spring(p,'wobble','wv',0,dt,38,5.5);
       const motion=reduce.matches?0:1;
       p.renderer.render(1,1,motion*settle*(1+p.hover*.22));
-      p.frame.style.transform=motion?`translate3d(${p.x*8}px,${p.y*7+Math.sin(elapsed*.9+p.index*2)*4*settle}px,0) rotateX(${-p.y*8}deg) rotateY(${p.x*9}deg) scale(${1+p.hover*.035-p.press*.06})`:'none';
+      const size=1+p.hover*.045-p.press*.055,stretch=clamp(p.wobble,-.4,.4)*.1;
+      p.frame.style.transform=motion?`translate3d(${p.x*11}px,${p.y*9+Math.sin(elapsed*.42+p.index*2)*4*settle}px,0) rotateX(${-p.y*7}deg) rotateY(${p.x*8}deg) rotateZ(${p.wobble*4}deg) scale(${size*(1+stretch)},${size*(1-stretch)})`:'none';
     }
     if(!reduce.matches&&planes.some(p=>p.visible&&!p.fallback))raf=requestAnimationFrame(tick);
   }

@@ -58,7 +58,7 @@
     } else if (m.type === "embed") {
       inner = `<iframe src="${esc(m.src)}" title="${alt || "영상"}" loading="lazy" allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowfullscreen></iframe>`;
     } else if (m.type === "audio") {
-      return `<audio class="audio" controls preload="metadata" src="${esc(src(m.src))}"></audio>`;
+      return `<figure class="audio-sample"><audio class="audio" controls preload="none" src="${esc(src(m.src))}" aria-label="${alt}"></audio>${m.caption ? `<figcaption>${esc(m.caption)}</figcaption>` : ''}</figure>`;
     } else {
       inner = `<img src="${esc(src(m.src))}" alt="${alt}" loading="${opts.hero ? "eager" : "lazy"}" decoding="async">`;
     }
@@ -153,17 +153,27 @@
 
     flow(sec) {
       const steps = sec.steps || [];
-      return `<ol class="flow" style="--steps:${steps.length}">${steps
+      return `${sec.body ? `<div class="prose section-intro">${paragraphs(sec.body)}</div>` : ''}<ol class="flow" style="--steps:${steps.length}">${steps
         .map(
           (s, i) => `
           <li class="flow__step">
-            <span class="flow__num">${i + 1}</span>
+            <span class="flow__num">STEP ${String(i + 1).padStart(2,'0')}</span>
             <h3 class="flow__title">${text(s.title)}</h3>
             <p class="flow__desc">${text(s.desc)}</p>
+            ${s.output ? `<p class="flow__output">${text(s.output)}</p>` : ''}
             ${s.media ? `<div class="flow__media">${media(s.media)}</div>` : ""}
           </li>`
         )
         .join("")}</ol>`;
+    },
+
+    cards(sec) {
+      return `<div class="detail-cards">${(sec.items || []).map((item,i)=>`<article class="detail-card"><span class="detail-card__number">${String(i+1).padStart(2,'0')}</span><h3>${text(item.title)}</h3><p>${text(item.body)}</p></article>`).join('')}</div>`;
+    },
+
+    matrix(sec) {
+      const columns=sec.columns||[];
+      return `<div class="matrix-wrap"><table class="matrix"><caption class="sr-only">${esc(sec.heading)}</caption><thead><tr>${columns.map(c=>`<th scope="col">${esc(c)}</th>`).join('')}</tr></thead><tbody>${(sec.rows||[]).map(row=>`<tr>${row.map((cell,i)=>i?`<td>${text(cell)}</td>`:`<th scope="row">${text(cell)}</th>`).join('')}</tr>`).join('')}</tbody></table></div>${sec.media ? `<div class="stack">${sec.media.map(m=>media(m)).join('')}</div>` : ''}`;
     },
 
     cta(sec) {
@@ -221,7 +231,7 @@
             ? `<span class="ph-text">담당 범위 미정</span>`
             : "";
           const audio = l.audio && filled(l.audio.src || l.audio)
-            ? `<audio class="audio" controls preload="metadata" src="${esc(src(l.audio.src || l.audio))}" aria-label="${esc(l.role)} 샘플"></audio>`
+            ? `<audio class="audio" controls preload="none" src="${esc(src(l.audio.src || l.audio))}" aria-label="${esc(l.role)} 샘플"></audio>`
             : SHOW_PH
             ? `<span class="ph-text">${esc(l.role)} 샘플 오디오</span>`
             : "";
@@ -268,7 +278,7 @@
       const poster = filled(m.poster) ? ` poster="${esc(src(m.poster))}"` : "";
       const tag =
         cmp.type === "audio"
-          ? `<audio class="audio" controls preload="metadata" src="${esc(src(m.src))}" data-ab aria-label="${name}"></audio>`
+          ? `<audio class="audio" controls preload="none" src="${esc(src(m.src))}" data-ab aria-label="${name}"></audio>`
           : `<div class="media" style="--ar:${r.css};--arn:${r.num}"><div class="media__box"><video controls playsinline preload="none"${poster} data-ab aria-label="${name}"><source src="${esc(src(m.src))}"></video></div></div>`;
       return `<div><p class="pair__label">${name}</p>${tag}</div>`;
     };
@@ -291,7 +301,7 @@
     const id = `s-${idx}`;
     return `
       <section class="block${sec.wide ? " block--wide" : ""}" aria-labelledby="${id}">
-        <h2 class="block__title" id="${id}">${esc(sec.heading || "")}</h2>
+        <h2 class="block__title" id="${id}"><span class="block__index">${String(idx+3).padStart(2,'0')}</span>${esc(sec.heading || "")}</h2>
         <div class="block__body">${sec.collapsible ? `<details class="additional-work"><summary>${esc(sec.toggleLabel || "추가 작업 보기")}</summary><div class="additional-work__body">${body}</div></details>` : body}</div>
       </section>`;
   }
@@ -392,14 +402,32 @@
       .map((m) => `<div><dt>${esc(m.label)}</dt><dd>${m.html}</dd></div>`)
       .join("");
 
+    const outcome=p.outcome || {};
+    const brief=(p.brief || []).map(item=>`<div><dt>${esc(item.label)}</dt><dd>${text(item.value)}</dd></div>`).join('');
+    const action=outcome.action ? `<a class="btn result-action" href="${esc(outcome.action.url)}" target="_blank" rel="noopener">${esc(outcome.action.label)}${ICON_ARROW}${NEW_TAB}</a>` : '';
     return `      <article class="project">
         <header class="project__head">
           <h1 class="project__title" id="project-title" tabindex="-1">${esc(p.title)}</h1>
-          <p class="project__lead">${text(p.lead) || esc(p.summary)}</p>
         </header>
-        ${meta ? `<dl class="project__meta">${meta}</dl>` : ""}
-        ${p.overview ? `<div class="project__overview prose">${paragraphs(p.overview)}</div>` : ""}
-        ${p.hero ? `<div class="project__hero">${media(p.hero, { hero: true })}</div>` : ""}
+        <section class="project-summary" aria-labelledby="summary-title">
+          <h2 class="project-section-title" id="summary-title"><span class="block__index">01</span>요약 설명</h2>
+          <div class="summary-card">
+            <p class="summary-card__lead">${text(p.lead) || esc(p.summary)}</p>
+            <dl class="summary-brief">${brief}</dl>
+            <p class="summary-focus"><span>핵심 설계</span><span class="summary-focus__value">${text(p.focus)}</span></p>
+            ${meta ? `<dl class="project__meta">${meta}</dl>` : ''}
+          </div>
+        </section>
+        <section class="project-result" aria-labelledby="result-title">
+          <h2 class="project-section-title" id="result-title"><span class="block__index">02</span>결과물</h2>
+          <div class="result-grid">
+            <div class="result-grid__media">${(outcome.media || []).map(m=>media(m,{hero:true})).join('')}</div>
+            <div class="result-grid__info"><h3>${text(outcome.title)}</h3><p>${text(outcome.body)}</p>
+              <ul class="result-points">${(outcome.points || []).map(point=>`<li><span>${text(point)}</span></li>`).join('')}</ul>
+              ${action}${outcome.note ? `<p class="result-note">${text(outcome.note)}</p>` : ''}
+            </div>
+          </div>
+        </section>
         ${(p.sections || []).map(section).join("")}
       </article>`;
   }
@@ -415,7 +443,7 @@
     const close = dialog.querySelector('.project-modal__close');
     let trigger = null, running = null, closing = false, opening = false;
     let expanded = false, scrollFrame = 0, expansionMotion = null;
-    const duration = () => reduceMotion.matches ? 0 : 880;
+    const duration = () => reduceMotion.matches ? 0 : 1320;
     function geometry() {
       const target = dialog.getBoundingClientRect();
       const from = trigger?.querySelector('.card__frame')?.getBoundingClientRect() || target;
@@ -439,8 +467,8 @@
         { transform: geometry(), borderRadius: '50%', opacity: .9 },
         { transform: 'scale(1.025, .985)', borderRadius: '70px', opacity: 1, offset: .72 },
         { transform: 'none', borderRadius: '42px', opacity: 1 }
-      ], {duration:d, easing:'cubic-bezier(.22,.85,.18,1)'});
-      cover.animate([{opacity:1},{opacity:1,offset:.3},{opacity:0}], {duration:d,easing:'cubic-bezier(.16,1,.3,1)',fill:'forwards'});
+      ], {duration:d, easing:'cubic-bezier(.25,.6,.25,1)'});
+      cover.animate([{opacity:1},{opacity:1,offset:.3},{opacity:0}], {duration:d,easing:'cubic-bezier(.25,.6,.25,1)',fill:'forwards'});
       scroll.animate([{opacity:0, transform:'translateY(36px)'},{opacity:0,offset:.36},{opacity:1,transform:'none'}], {duration:d,easing:'cubic-bezier(.22,.7,.2,1)'});
       running.finished.then(() => {
         running = null; opening = false;
@@ -456,9 +484,9 @@
       // Removing embedded players also stops playback in cross-origin frames.
       scroll.querySelectorAll('iframe').forEach(el => el.remove());
       dialog.classList.remove('is-revealed');
-      cover.animate([{opacity:0},{opacity:1}], {duration:reduceMotion.matches?0:220,easing:'cubic-bezier(.16,1,.3,1)',fill:'forwards'});
-      scroll.animate([{opacity:1},{opacity:0}], {duration:reduceMotion.matches?0:160,easing:'cubic-bezier(.4,0,.8,1)',fill:'forwards'});
-      running = dialog.animate([{transform:'none',opacity:1},{transform:geometry(),borderRadius:'50%',opacity:0}], {duration:reduceMotion.matches?0:540,easing:'cubic-bezier(.5,0,.25,1)'});
+      cover.animate([{opacity:0},{opacity:1}], {duration:reduceMotion.matches?0:350,easing:'cubic-bezier(.16,1,.3,1)',fill:'forwards'});
+      scroll.animate([{opacity:1},{opacity:0}], {duration:reduceMotion.matches?0:300,easing:'cubic-bezier(.4,0,.8,1)',fill:'forwards'});
+      running = dialog.animate([{transform:'none',opacity:1},{transform:geometry(),borderRadius:'50%',opacity:0}], {duration:reduceMotion.matches?0:820,easing:'cubic-bezier(.5,0,.25,1)'});
       await running.finished.catch(() => {});
       dialog.close(); scroll.innerHTML = ''; running = null; closing = false;
       // Drop filled opacity animations before the next project is opened.
@@ -497,7 +525,7 @@
         expansionMotion = dialog.animate([
           {transform:`translate(${x}px, ${y}px) scale(${before.width/after.width}, ${before.height/after.height})`, borderRadius:'42px'},
           {transform:'none', borderRadius:'24px'}
-        ], {duration:reduceMotion.matches?0:560, easing:'cubic-bezier(.16,1,.3,1)'});
+        ], {duration:reduceMotion.matches?0:900, easing:'cubic-bezier(.22,.65,.25,1)'});
       });
     }, {passive:true});
   }

@@ -25,14 +25,14 @@ vercel.json                정적 배포 설정 (/projects/antiframe 처럼 .htm
 | 카드 이미지 넣기 | `data.js` → 해당 작업 `card.src` |
 | 카드에 짧은 무음 영상 | `card.type: "video"`, `card.src`, `card.poster` |
 | 카드에서 잘리는 위치 | `card.position` (예: `"50% 30%"`) |
-| 완성 영상 넣기 | `hero.src` (mp4 경로 또는 유튜브 임베드 주소, 그때 `type: "embed"`) |
+| 최상단 결과물 넣기 | `outcome.media.src` (mp4 경로 또는 유튜브 임베드 주소, 그때 `type: "embed"`) |
 | 세로 영상 | `aspect: "9/16"` (잘리거나 늘어나지 않음) |
 | 문구 채우기 | `PH("...")` 를 실제 문장 `"..."` 으로 교체 |
 | 섹션 숨기기 | 섹션에 `hidden: true` |
 | 자리표시자 전부 숨기기(제출용) | `site.showPlaceholders: false` → `draft: true` 섹션과 빈 미디어가 사라짐 |
-| 데모 버튼 켜기 | Antiframe `type: "cta"` 섹션의 `url` |
+| 데모 버튼 켜기 | Antiframe `outcome.action.url` |
 | 연락처 | `site.contact` |
-| 카드 물결 모션 | `wave-gallery.js`의 vertex shader. `data.js`의 `motion.enabled: false`면 끔 |
+| 카드 물결·탄성 모션 | `wave-gallery.js`의 fragment shader와 스프링 설정. `data.js`의 `motion.enabled: false`면 끔 |
 | 배경·글자색, 카드 간격·크기, 여백 | `style.css` 맨 위 `:root` |
 | 글꼴 | 각 HTML의 Google Fonts 링크 + `style.css`의 `--font-sans` |
 
@@ -46,7 +46,11 @@ vercel.json                정적 배포 설정 (/projects/antiframe 처럼 .htm
 - `compare` 전후 비교 한 쌍. `type: "image"` 는 드래그 슬라이더, `"video"`·`"audio"` 는 나란히 재생 + ‘같은 지점에서 바꿔 듣기’
 - `layers` 사운드 역할별 구성(대사·효과음·환경음·음악). `source` 로 AI 생성 / 직접 제작·편집 / AI 생성 후 직접 편집 표시
 - `gallery` 이미지·영상 모음
+- `cards` 번호가 있는 2단 설명 카드
+- `matrix` 행·열 구분선이 있는 검수 기준 표 (모바일 내부 스크롤)
 - `cta` 새 탭으로 여는 버튼
+
+각 상세페이지는 `brief`·`focus`·`meta`의 **요약 설명**, `outcome`의 **결과물**, `sections`의 **상세 워크플로** 순서로 표시됩니다.
 
 소리가 있는 영상·오디오는 사용자가 누를 때만 재생됩니다. HTML 영상·오디오끼리는 하나를 재생하면 나머지가 멈추며, YouTube 임베드는 별도로 제어합니다.
 
@@ -77,6 +81,13 @@ GitHub 웹 업로드는 파일당 25MB, git 푸시는 100MB가 한도입니다.
 
 - 공녀님: 원작 컷과 세로 프레임, 화자별 생성 이미지, 합성 결과 및 공개 홍보 영상.
 - 맹종: 완성본, 대사 생성 소재, 효과음 후보 비교, 장면별 음악 큐.
-- Antiframe: 기존 서비스 화면과 42명 베타 테스트 현황. 실제 제작 체험 URL은 확인 후 연결합니다.
+- Antiframe: 실제 생성 영상과 42명 베타 테스트 현황, 로그인 없이 이용하는 제작 체험 URL.
 - 원본 마스터와 작업 문서는 저장소에 포함하지 않았습니다. 사이트에는 선별 이미지와 압축 오디오만 포함합니다.
-- 메인은 곡면에 이미지를 그리는 WebGL 모션을 사용합니다. 모바일·모션 감소 설정·WebGL 미지원 시 정적인 이미지로 표시합니다.
+- 메인은 WebGL 물방울 모션을 사용합니다. 화면 밖·백그라운드·팝업 열람 중에는 모션을 중단하고, 모션 감소 설정·WebGL 미지원 시 정적인 이미지로 표시합니다.
+
+## 2026-10-01 설명·인터랙션 개선
+
+- 원본 Antiframe 로고를 새 썸네일 파일로 반영해 기존 이미지 캐시와 구분했습니다.
+- 인트로·물결·팝업 전환을 느리게 조정하고, 마우스 위치에 반응하는 탄성 움직임을 적용했습니다.
+- 상세페이지 상단에 요약과 결과물을 우선 배치하고, 이후 제작 워크플로·문제 해결·검수 기준을 번호로 구분했습니다.
+- 공녀님은 화자 분리·합성과 실제 편집 타임라인, 맹종은 음성·효과음·음악의 생성 및 직접 편집 과정을 중심으로 설명합니다.
