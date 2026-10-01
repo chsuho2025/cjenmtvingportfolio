@@ -5,8 +5,8 @@ window.initWaveGallery = function(root, options = {}) {
   const desktop = matchMedia('(hover: hover) and (pointer: fine)');
   const toggle = document.querySelector('.motion-toggle');
   let enabled = options.enabled !== false;
-  try { enabled = enabled && localStorage.getItem('portfolio-motion') !== 'off'; } catch (_) {}
-  let active = false, visible = true, raf = 0, last = 0, elapsed = 0;
+  // Motion follows system accessibility preferences; no extra UI controls.
+  let active = false, visible = true, modalOpen = false, raf = 0, last = 0, elapsed = 0;
   const pointer = {x:0,y:0,tx:0,ty:0,energy:0};
   const vertex = `
     precision mediump float;
@@ -16,12 +16,12 @@ window.initWaveGallery = function(root, options = {}) {
     varying vec2 v_uv;
     void main() {
       v_uv = a_uv;
-      float phase = u_time * .58 + u_index * 2.1;
+      float phase = u_time * .83 + u_index * 2.1;
       vec2 p = (a_uv - .5) * 1.88;
-      p *= 1.0 + .012 * u_hover;
-      p.y += sin(phase) * .016;
-      p.x += cos(phase * .73) * .009;
-      p += vec2(u_pointer.x, -u_pointer.y) * .012 * u_hover;
+      p *= 1.0 + .055 * u_hover;
+      p.y += sin(phase) * .035;
+      p.x += cos(phase * .73) * .022;
+      p += vec2(u_pointer.x, -u_pointer.y) * .026 * u_hover;
       gl_Position = vec4(p, 0.0, 1.0);
     }`;
   const fragment = `
@@ -33,13 +33,13 @@ window.initWaveGallery = function(root, options = {}) {
     void main() {
       vec2 center = v_uv - .5;
       float angle = atan(center.y, center.x);
-      float phase = u_time * .58 + u_index * 2.1;
-      float strength = 1.0 + .35 * u_hover + .12 * u_energy;
+      float phase = u_time * .83 + u_index * 2.1;
+      float strength = 1.0 + .32 * u_hover + .18 * u_energy;
       // Low-order waves preserve a rounded droplet rather than a wavy rectangle.
-      float contour = (.011 * sin(2.0 * angle + phase)
-                     + .008 * sin(3.0 * angle - phase * .81)
-                     + .003 * cos(5.0 * angle + phase * .57)) * strength;
-      float radius = .455 + contour;
+      float contour = (.022 * sin(2.0 * angle + phase)
+                     + .014 * sin(3.0 * angle - phase * .81)
+                     + .005 * cos(5.0 * angle + phase * .57)) * strength;
+      float radius = .44 + contour;
       float r = length(center);
       float distance = r - radius;
       float alpha = 1.0 - smoothstep(-.002, .001, distance);
@@ -117,14 +117,14 @@ window.initWaveGallery = function(root, options = {}) {
     gl.drawArrays(gl.TRIANGLES,0,p.count);
   }
   function tick(time){
-    raf=0;if(!active||document.hidden||!visible)return;
+    raf=0;if(!active||document.hidden||!visible||modalOpen)return;
     const dt=Math.min(last?(time-last)/1000:1/60,.05);last=time;elapsed+=dt;
     const smooth=1-Math.exp(-dt*5);
     pointer.x+=(pointer.tx-pointer.x)*smooth;pointer.y+=(pointer.ty-pointer.y)*smooth;pointer.energy*=Math.exp(-dt*2.5);
     for(const p of planes){if(!p.ready)continue;p.hover+=(p.target-p.hover)*smooth;draw(p);}
     raf=requestAnimationFrame(tick);
   }
-  function kick(){if(active&&!raf&&!document.hidden&&visible){last=0;raf=requestAnimationFrame(tick);}}
+  function kick(){if(active&&!raf&&!document.hidden&&visible&&!modalOpen){last=0;raf=requestAnimationFrame(tick);}}
   function sync(){
     const supported=planes.some(p=>p.ready);
     active=enabled&&!reduce.matches&&supported;
@@ -140,6 +140,7 @@ window.initWaveGallery = function(root, options = {}) {
   root.addEventListener('pointerleave',()=>{pointer.tx=pointer.ty=0;});
   toggle?.addEventListener('click',()=>{enabled=!enabled;try{localStorage.setItem('portfolio-motion',enabled?'on':'off');}catch(_){}sync();});
   [reduce,desktop].forEach(q=>q.addEventListener('change',sync));
+  document.addEventListener('portfolio:modal',e=>{modalOpen=!!e.detail.open;if(modalOpen){cancelAnimationFrame(raf);raf=0;}else kick();});
   document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelAnimationFrame(raf);raf=0;}else kick();});
   const observer=new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;if(visible)kick();else{cancelAnimationFrame(raf);raf=0;}},{rootMargin:'80px'});observer.observe(root);
   sync();

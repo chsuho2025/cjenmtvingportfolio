@@ -84,19 +84,7 @@
 
   /* ───────── shared chrome ───────── */
   function header(page) {
-    const intro =
-      page === "home" && SITE.showIntro && filled(SITE.intro) ? `<p class="site-header__intro">${esc(SITE.intro)}</p>` : "";
-    const nav =
-      page === "home"
-        ? `<button class="motion-toggle" type="button" aria-pressed="true">모션 켜짐</button>`
-        : `<a href="${homeHref()}">전체 작업</a>`;
-    return `
-      <a class="brand" href="${homeHref()}">
-        <span class="brand__name">${esc(SITE.name)}</span>
-        <span class="brand__sub">${esc(SITE.subtitle)}</span>
-      </a>
-      ${intro}
-      <nav class="site-nav" aria-label="사이트">${nav}</nav>`;
+    return `<a class="portfolio-name" href="${homeHref()}">AI 콘텐츠 제작자 - 최수호</a>`;
   }
 
   function contactList() {
@@ -111,16 +99,11 @@
     return SHOW_PH ? `<p class="ph-text">연락처 자리표시자: data.js 의 site.contact 에 이메일·링크를 입력하세요</p>` : "";
   }
 
-  function footer(page) {
-    return `
-      <div class="site-footer__name">${esc(SITE.name)}</div>
-      <div class="site-footer__contact">${contactList()}</div>
-      ${page !== "home" ? `<a class="site-footer__home" href="${homeHref()}">메인으로</a>` : ""}`;
-  }
+  function footer() { return ""; }
 
   /* ───────── cards ───────── */
   function card(p, i, { mini = false } = {}) {
-    const target = mini ? "" : ` target="_blank" rel="noopener"`;
+    const target = ` data-project="${esc(p.slug)}"`;
     return `
       <li class="card-item${mini ? " card-item--mini" : ""}" style="--i:${i}">
         <a class="card" href="${projectHref(p.slug)}"${target}>
@@ -128,10 +111,10 @@
             <div class="card__media">${cardMedia(p.card)}</div>
           </div>
           <div class="card__caption">
-            <span class="card__title">${esc(p.title)}${ICON_ARROW}</span>
+            <span class="card__title">${esc(p.title)}</span>
             <span class="card__summary">${esc(p.summary)}</span>
             ${mini ? "" : `<span class="card__competency"><span class="sr-only">핵심 역량: </span>${esc(p.competency)}</span>`}
-            ${mini ? "" : NEW_TAB}
+
           </div>
         </a>
       </li>`;
@@ -399,6 +382,114 @@
     }
     tilt(list);
     cardVideos();
+    setupProjectModal();
+    exclusivePlayback();
+  }
+
+  function projectArticle(p) {
+    const meta = (p.meta || [])
+      .map((m) => ({ ...m, html: text(m.value) }))
+      .filter((m) => m.html)
+      .map((m) => `<div><dt>${esc(m.label)}</dt><dd>${m.html}</dd></div>`)
+      .join("");
+
+    return `      <article class="project">
+        <header class="project__head">
+          <h1 class="project__title" id="project-title" tabindex="-1">${esc(p.title)}</h1>
+          <p class="project__lead">${text(p.lead) || esc(p.summary)}</p>
+        </header>
+        ${meta ? `<dl class="project__meta">${meta}</dl>` : ""}
+        ${p.overview ? `<div class="project__overview prose">${paragraphs(p.overview)}</div>` : ""}
+        ${p.hero ? `<div class="project__hero">${media(p.hero, { hero: true })}</div>` : ""}
+        ${(p.sections || []).map(section).join("")}
+      </article>`;
+  }
+
+  function setupProjectModal() {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'project-modal';
+    dialog.setAttribute('aria-labelledby', 'project-title');
+    dialog.innerHTML = `<button class="project-modal__close" type="button" aria-label="프로젝트 닫기"><span aria-hidden="true">×</span></button><div class="project-modal__scroll" tabindex="0" aria-label="프로젝트 내용"></div><div class="project-modal__cover" aria-hidden="true"></div>`;
+    document.body.append(dialog);
+    const scroll = dialog.querySelector('.project-modal__scroll');
+    const cover = dialog.querySelector('.project-modal__cover');
+    const close = dialog.querySelector('.project-modal__close');
+    let trigger = null, running = null, closing = false, opening = false;
+    let expansion = 0, scrollFrame = 0;
+    const duration = () => reduceMotion.matches ? 0 : 880;
+    function geometry() {
+      const target = dialog.getBoundingClientRect();
+      const from = trigger?.querySelector('.card__frame')?.getBoundingClientRect() || target;
+      return `translate(${from.left + from.width/2 - target.left - target.width/2}px, ${from.top + from.height/2 - target.top - target.height/2}px) scale(${from.width/target.width}, ${from.height/target.height})`;
+    }
+    function openProject(p, anchor) {
+      if (dialog.open) return;
+      trigger = anchor; closing = false; opening = true; expansion = 0;
+      dialog.style.setProperty('--expand', '0');
+      scroll.innerHTML = projectArticle(p);
+      cover.style.backgroundImage = `url("${src(p.card.src)}")`;
+      cover.style.backgroundPosition = p.card.position || 'center';
+      dialog.classList.remove('is-revealed');
+      document.body.classList.add('project-is-open');
+      dialog.showModal(); scroll.scrollTop = 0;
+      document.dispatchEvent(new CustomEvent('portfolio:modal', {detail: {open: true}}));
+      document.title = `${p.title} | 최수호`;
+      const d = duration();
+      running = dialog.animate([
+        { transform: geometry(), borderRadius: '50%', opacity: .9 },
+        { transform: 'scale(1.025, .985)', borderRadius: '70px', opacity: 1, offset: .72 },
+        { transform: 'none', borderRadius: '42px', opacity: 1 }
+      ], {duration:d, easing:'cubic-bezier(.22,.85,.18,1)'});
+      cover.animate([{opacity:1},{opacity:1,offset:.3},{opacity:0}], {duration:d,fill:'forwards'});
+      scroll.animate([{opacity:0, transform:'translateY(36px)'},{opacity:0,offset:.36},{opacity:1,transform:'none'}], {duration:d});
+      running.finished.then(() => {
+        running = null; opening = false;
+        dialog.classList.add('is-revealed');
+        dialog.querySelector('.project__title').focus({preventScroll:true});
+      }).catch(() => {});
+      sliders();
+    }
+    async function closeProject() {
+      if (!dialog.open || closing) return;
+      closing = true; opening = false; running?.cancel();
+      scroll.querySelectorAll('audio,video').forEach(el => el.pause());
+      // Removing embedded players also stops playback in cross-origin frames.
+      scroll.querySelectorAll('iframe').forEach(el => el.remove());
+      dialog.classList.remove('is-revealed');
+      cover.animate([{opacity:0},{opacity:1}], {duration:reduceMotion.matches?0:220,fill:'forwards'});
+      scroll.animate([{opacity:1},{opacity:0}], {duration:reduceMotion.matches?0:160,fill:'forwards'});
+      running = dialog.animate([{transform:'none',opacity:1},{transform:geometry(),borderRadius:'50%',opacity:0}], {duration:reduceMotion.matches?0:540,easing:'cubic-bezier(.5,0,.25,1)'});
+      await running.finished.catch(() => {});
+      dialog.close(); scroll.innerHTML = ''; running = null; closing = false;
+      // Drop filled opacity animations before the next project is opened.
+      scroll.getAnimations().forEach(a => a.cancel());
+      cover.getAnimations().forEach(a => a.cancel());
+      document.body.classList.remove('project-is-open');
+      document.dispatchEvent(new CustomEvent('portfolio:modal', {detail:{open:false}}));
+      document.title = 'AI 콘텐츠 제작자 - 최수호';
+      trigger?.focus({preventScroll:true});
+    }
+    document.querySelector('.gallery').addEventListener('click', e => {
+      const anchor = e.target.closest('[data-project]');
+      if (!anchor || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const p = DATA.projects.find(p => p.slug === anchor.dataset.project);
+      if (!p) return;
+      e.preventDefault(); openProject(p, anchor);
+    });
+    close.addEventListener('click', closeProject);
+    dialog.addEventListener('cancel', e => {e.preventDefault(); closeProject();});
+    dialog.addEventListener('click', e => {if (e.target === dialog) {
+      const r=dialog.getBoundingClientRect();
+      if(e.clientX<r.left || e.clientX>r.right || e.clientY<r.top || e.clientY>r.bottom) closeProject();
+    }});
+    scroll.addEventListener('scroll', () => {
+      if (opening || closing || scrollFrame) return;
+      scrollFrame = requestAnimationFrame(() => {
+        scrollFrame = 0;
+        expansion = Math.min(1, Math.max(expansion, scroll.scrollTop/150));
+        dialog.style.setProperty('--expand', String(expansion));
+      });
+    }, {passive:true});
   }
 
   function project(slug) {
@@ -412,24 +503,8 @@
     }
     document.title = `${p.title} | ${SITE.name}`;
 
-    const meta = (p.meta || [])
-      .map((m) => ({ ...m, html: text(m.value) }))
-      .filter((m) => m.html)
-      .map((m) => `<div><dt>${esc(m.label)}</dt><dd>${m.html}</dd></div>`)
-      .join("");
-
     const others = DATA.projects.filter((o) => o.slug !== slug);
-
-    main.innerHTML = `
-      <article class="project">
-        <header class="project__head">
-          <h1 class="project__title">${esc(p.title)}</h1>
-          <p class="project__lead">${text(p.lead) || esc(p.summary)}</p>
-        </header>
-        ${meta ? `<dl class="project__meta">${meta}</dl>` : ""}
-        ${p.hero ? `<div class="project__hero">${media(p.hero, { hero: true })}</div>` : ""}
-        ${(p.sections || []).map(section).join("")}
-      </article>
+    main.innerHTML = `${projectArticle(p)}
       <nav class="more" aria-labelledby="more-title">
         <div class="more__head">
           <h2 class="more__title" id="more-title">다른 작업</h2>
