@@ -65,7 +65,7 @@
     const yt = m.type === "embed" && m.src.match(/youtube(?:-nocookie)?\.com\/embed\/([\w-]+)/);
     const fallback = yt ? `<a class="media__external" href="https://www.youtube.com/watch?v=${yt[1]}" target="_blank" rel="noopener">YouTube에서 보기${NEW_TAB}</a>` : "";
     const caption = filled(m.caption) || fallback ? `<figcaption>${filled(m.caption) ? esc(m.caption) : ""}${fallback}</figcaption>` : "";
-    return `<figure class="media${portrait}" style="${style}"><div class="media__box">${inner}</div>${caption}</figure>`;
+    return `<figure class="media${portrait}${yt ? " media--embed" : ""}" style="${style}"><div class="media__box">${inner}</div>${caption}</figure>`;
   }
 
   // 카드용: 항상 정사각형, cover
@@ -104,6 +104,8 @@
   /* ───────── cards ───────── */
   function card(p, i, { mini = false } = {}) {
     const target = ` data-project="${esc(p.slug)}"`;
+    const [projectType, workName] = p.title.split(" — ");
+    const cardTitle = esc(projectType) + (workName ? `<span class="card__work-name">${esc(workName)}</span>` : "");
     return `
       <li class="card-item${mini ? " card-item--mini" : ""}" style="--i:${i}">
         <a class="card" href="${projectHref(p.slug)}"${target}>
@@ -111,7 +113,8 @@
             <div class="card__media">${cardMedia(p.card)}</div>
           </div>
           <div class="card__caption">
-            <span class="card__title">${esc(p.title)}</span>
+            ${mini ? "" : `<span class="card__number">${String(i + 1).padStart(2, "0")}</span>`}
+            <span class="card__title">${cardTitle}</span>
             <span class="card__summary">${esc(p.summary)}</span>
             ${mini ? "" : `<span class="card__competency"><span class="sr-only">핵심 역량: </span>${esc(p.competency)}</span>`}
 
