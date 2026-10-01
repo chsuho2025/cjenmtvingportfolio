@@ -414,7 +414,7 @@
     const cover = dialog.querySelector('.project-modal__cover');
     const close = dialog.querySelector('.project-modal__close');
     let trigger = null, running = null, closing = false, opening = false;
-    let expansion = 0, scrollFrame = 0;
+    let expanded = false, scrollFrame = 0, expansionMotion = null;
     const duration = () => reduceMotion.matches ? 0 : 880;
     function geometry() {
       const target = dialog.getBoundingClientRect();
@@ -423,7 +423,8 @@
     }
     function openProject(p, anchor) {
       if (dialog.open) return;
-      trigger = anchor; closing = false; opening = true; expansion = 0;
+      trigger = anchor; closing = false; opening = true; expanded = false;
+      expansionMotion?.cancel(); expansionMotion = null;
       dialog.style.setProperty('--expand', '0');
       scroll.innerHTML = projectArticle(p);
       cover.style.backgroundImage = `url("${src(p.card.src)}")`;
@@ -450,7 +451,7 @@
     }
     async function closeProject() {
       if (!dialog.open || closing) return;
-      closing = true; opening = false; running?.cancel();
+      closing = true; opening = false; running?.cancel(); expansionMotion?.cancel();
       scroll.querySelectorAll('audio,video').forEach(el => el.pause());
       // Removing embedded players also stops playback in cross-origin frames.
       scroll.querySelectorAll('iframe').forEach(el => el.remove());
@@ -482,11 +483,21 @@
       if(e.clientX<r.left || e.clientX>r.right || e.clientY<r.top || e.clientY>r.bottom) closeProject();
     }});
     scroll.addEventListener('scroll', () => {
-      if (opening || closing || scrollFrame) return;
+      if (opening || closing || expanded || scrollFrame || scroll.scrollTop < 12) return;
       scrollFrame = requestAnimationFrame(() => {
         scrollFrame = 0;
-        expansion = Math.min(1, Math.max(expansion, scroll.scrollTop/150));
-        dialog.style.setProperty('--expand', String(expansion));
+        if (!dialog.open || opening || closing || expanded) return;
+        expanded = true;
+        // Lay out the article once at its final size, then animate the surface on the compositor.
+        const before = dialog.getBoundingClientRect();
+        dialog.style.setProperty('--expand', '1');
+        const after = dialog.getBoundingClientRect();
+        const x = before.left + before.width/2 - after.left - after.width/2;
+        const y = before.top + before.height/2 - after.top - after.height/2;
+        expansionMotion = dialog.animate([
+          {transform:`translate(${x}px, ${y}px) scale(${before.width/after.width}, ${before.height/after.height})`, borderRadius:'42px'},
+          {transform:'none', borderRadius:'24px'}
+        ], {duration:reduceMotion.matches?0:560, easing:'cubic-bezier(.16,1,.3,1)'});
       });
     }, {passive:true});
   }
