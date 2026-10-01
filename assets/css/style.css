@@ -38,7 +38,7 @@
 
 /* ───────── base ───────── */
 *, *::before, *::after { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; overflow-x:clip; }
 body {
   margin: 0;
   background: var(--bg);
@@ -643,3 +643,21 @@ button { font: inherit; }
 
 .intro-brand { position:fixed; pointer-events:none; z-index:26; }
 .intro-brand svg { display:block; width:100%; height:100%; }
+
+/* Opening notice: original film wording, before any project media is mounted. */
+.project__subtitle { margin:12px 0 0; color:#62666b; font-size:clamp(17px,2vw,23px); }
+.viewing-notice-open { overflow:hidden; }
+.viewing-notice { position:fixed; inset:0; width:100%; height:100dvh; max-width:none; max-height:none; margin:0; padding:28px; border:0; background:#0c0d10; color:#f7f7f7; }
+.viewing-notice[open] { display:grid; place-items:center; }
+.viewing-notice::backdrop { background:#0c0d10; }
+.viewing-notice__body { max-width:650px; width:100%; text-align:center; }
+.viewing-notice__eyebrow { margin:0 0 20px; color:#a8abb1; font-size:16px; }
+.viewing-notice h2 { margin:0 0 32px; font-size:clamp(25px,4vw,36px); font-weight:500; }
+.viewing-notice #viewing-notice-copy { font-size:clamp(17px,2.1vw,23px); line-height:1.85; word-break:keep-all; }
+.viewing-notice strong { color:#ff7474; font-weight:600; }
+.viewing-notice__progress { height:3px; width:min(280px,80%); margin:38px auto 22px; overflow:hidden; border-radius:3px; background:#33353b; }
+.viewing-notice__progress span { display:block; height:100%; background:#eee; transform:scaleX(0); transform-origin:left center; }
+.viewing-notice__cancel { padding:12px 18px; border:0; background:transparent; color:#b8bbc2; font:inherit; font-size:13px; cursor:pointer; }
+.viewing-notice__cancel:hover { color:#fff; }
+.viewing-notice__cancel:focus-visible { outline:1px solid #b8bbc2; outline-offset:3px; border-radius:6px; }
+@media(max-width:600px) { .notice-break { display:none; } }

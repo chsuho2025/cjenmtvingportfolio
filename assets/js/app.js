@@ -84,7 +84,7 @@
 
   /* ───────── shared chrome ───────── */
   function header(page) {
-    return `<a class="portfolio-name" href="${homeHref()}">AI 콘텐츠 제작자 - 최수호</a>`;
+    return `<a class="portfolio-name" href="${homeHref()}">최수호 - AI Contents Builder 지원자</a>`;
   }
 
   function contactList() {
@@ -105,7 +105,7 @@
   function card(p, i, { mini = false } = {}) {
     const target = ` data-project="${esc(p.slug)}"`;
     const [projectType, workName] = p.title.split(" — ");
-    const cardTitle = esc(projectType) + (workName ? `<span class="card__work-name">${esc(workName)}</span>` : "");
+    const cardTitle = esc(projectType) + (workName ? `<span class="card__work-name">${esc(workName)}</span>` : p.subtitle ? `<span class="card__work-name">${esc(p.subtitle)}</span>` : "");
     return `
       <li class="card-item${mini ? " card-item--mini" : ""}" style="--i:${i}">
         <a class="card" href="${projectHref(p.slug)}"${target}>
@@ -420,6 +420,7 @@
         <header class="project__head">
           <p class="project__eyebrow">${esc(p.articleLabel || 'AI 콘텐츠 제작 · 프로젝트 기록')}</p>
           <h1 class="project__title" id="project-title" tabindex="-1">${esc(p.title)}</h1>
+          ${p.subtitle ? `<p class="project__subtitle">${esc(p.subtitle)}</p>` : ""}
         </header>
         <section class="project-summary" aria-labelledby="summary-title">
           <h2 class="project-section-title" id="summary-title">프로젝트 요약</h2>
@@ -438,6 +439,53 @@
       </article>`;
   }
 
+  // The wording matches the opening notice in the original Maengjong film.
+  function showViewingNotice() {
+    return new Promise(resolve => {
+      const notice = document.createElement('dialog');
+      notice.className = 'viewing-notice';
+      notice.setAttribute('aria-labelledby', 'viewing-notice-title');
+      notice.setAttribute('aria-describedby', 'viewing-notice-copy');
+      notice.innerHTML = `<div class="viewing-notice__body">
+        <p class="viewing-notice__eyebrow">《맹종》</p>
+        <h2 id="viewing-notice-title">시청 전 안내</h2>
+        <p id="viewing-notice-copy">본 영상에는 강한 빛의 점멸 및 빠른 화면 전환과<br class="notice-break">
+        <strong>갑작스러운 공포감</strong>을 유발할 수 있는<br class="notice-break">
+        음향 효과가 포함되어 있습니다.</p>
+        <div class="viewing-notice__progress" role="progressbar" aria-label="상세페이지 열기까지 2.5초" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span></span></div>
+        <button class="viewing-notice__cancel" type="button">목록으로 돌아가기</button>
+      </div>`;
+      document.body.append(notice);
+      document.body.classList.add('viewing-notice-open');
+      notice.showModal();
+      document.dispatchEvent(new CustomEvent('portfolio:modal', {detail:{open:true}}));
+      const progress = notice.querySelector('.viewing-notice__progress');
+      const fill = progress.firstElementChild;
+      let settled = false;
+      const reveal = notice.querySelector('.viewing-notice__body').animate([{opacity:0},{opacity:1}], {duration:reduceMotion.matches ? 0 : 220, fill:'both'});
+      const timer = fill.animate([{transform:'scaleX(0)'},{transform:'scaleX(1)'}], {duration:2500, easing:'linear', fill:'forwards'});
+      const start = performance.now();
+      const tick = setInterval(() => progress.setAttribute('aria-valuenow', String(Math.min(100, Math.round((performance.now()-start)/25)))), 100);
+      async function finish(proceed) {
+        if (settled) return;
+        settled = true;
+        clearInterval(tick);
+        if (proceed) {
+          progress.setAttribute('aria-valuenow', '100');
+          await notice.animate([{opacity:1},{opacity:0}], {duration:reduceMotion.matches ? 0 : 220, fill:'forwards'}).finished.catch(()=>{});
+        }
+        timer.cancel(); reveal.cancel();
+        notice.close(); notice.remove();
+        document.body.classList.remove('viewing-notice-open');
+        document.dispatchEvent(new CustomEvent('portfolio:modal', {detail:{open:false}}));
+        resolve(proceed);
+      }
+      timer.finished.then(()=>finish(true)).catch(()=>{});
+      notice.querySelector('button').addEventListener('click', ()=>finish(false));
+      notice.addEventListener('cancel', e=>{e.preventDefault(); finish(false);});
+    });
+  }
+
   function setupProjectModal() {
     const dialog = document.createElement('dialog');
     dialog.className = 'project-modal';
@@ -447,7 +495,7 @@
     const scroll = dialog.querySelector('.project-modal__scroll');
     const cover = dialog.querySelector('.project-modal__cover');
     const close = dialog.querySelector('.project-modal__close');
-    let trigger = null, running = null, closing = false, opening = false;
+    let trigger = null, running = null, closing = false, opening = false, noticePending = false;
     let expanded = false, scrollFrame = 0, expansionMotion = null;
     const duration = () => reduceMotion.matches ? 0 : 1320;
     function geometry() {
@@ -455,8 +503,14 @@
       const from = trigger?.querySelector('.card__frame')?.getBoundingClientRect() || target;
       return `translate(${from.left + from.width/2 - target.left - target.width/2}px, ${from.top + from.height/2 - target.top - target.height/2}px) scale(${from.width/target.width}, ${from.height/target.height})`;
     }
-    function openProject(p, anchor) {
-      if (dialog.open) return;
+    async function openProject(p, anchor) {
+      if (dialog.open || noticePending) return;
+      if (p.slug === 'maengjong') {
+        noticePending = true;
+        const proceed = await showViewingNotice();
+        noticePending = false;
+        if (!proceed) { anchor?.focus({preventScroll:true}); return; }
+      }
       trigger = anchor; closing = false; opening = true; expanded = false;
       expansionMotion?.cancel(); expansionMotion = null;
       dialog.style.setProperty('--expand', '0');
@@ -502,7 +556,7 @@
       cover.getAnimations().forEach(a => a.cancel());
       document.body.classList.remove('project-is-open');
       document.dispatchEvent(new CustomEvent('portfolio:modal', {detail:{open:false}}));
-      document.title = 'AI 콘텐츠 제작자 - 최수호';
+      document.title = '최수호 - AI Contents Builder 지원자';
       trigger?.focus({preventScroll:true});
     }
     document.querySelector('.gallery').addEventListener('click', e => {
@@ -546,7 +600,7 @@
     }, {passive:true});
   }
 
-  function project(slug) {
+  async function project(slug) {
     mountChrome("project");
     const main = document.getElementById("content");
     const idx = DATA.projects.findIndex((p) => p.slug === slug);
@@ -556,6 +610,10 @@
       return;
     }
     document.title = `${p.title} | ${SITE.name}`;
+    if (slug === "maengjong" && !await showViewingNotice()) {
+      window.location.href = homeHref();
+      return;
+    }
 
     const others = DATA.projects.filter((o) => o.slug !== slug);
     main.innerHTML = `${projectArticle(p)}
