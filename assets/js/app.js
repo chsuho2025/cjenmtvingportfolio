@@ -377,16 +377,11 @@
     mountChrome("home");
     const list = document.getElementById("gallery");
     list.innerHTML = DATA.projects.map((p, i) => card(p, i)).join("");
-    if (MOTION.enabled && MOTION.intro && !reduceMotion.matches) {
-      list.classList.add("is-intro");
-      list.addEventListener("animationend", (e) => {
-        if (e.target.matches(".card-item:last-child")) list.classList.remove("is-intro");
-      });
-    }
     tilt(list);
     cardVideos();
     setupProjectModal();
     exclusivePlayback();
+    window.initLiquidIntro?.(list);
   }
 
   function projectArticle(p) {

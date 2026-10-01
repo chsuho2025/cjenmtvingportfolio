@@ -7,6 +7,12 @@
   <meta name="description" content="최수호 AI 콘텐츠 제작 포트폴리오. AI 영상 제작 도구와 웹툰 기반 AI 애니메이션 제작 과정.">
   <meta property="og:title" content="SOOHO CHOI | AI Content Builder Portfolio">
   <meta property="og:description" content="창작자의 의도를 AI 제작 워크플로로 구현합니다.">
+  <script>
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('has-liquid-intro');
+      setTimeout(() => document.documentElement.classList.remove('has-liquid-intro'), 6500);
+    }
+  </script>
   <!-- 글꼴: 바꾸려면 이 줄과 style.css 의 --font-sans 를 함께 수정 -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,6 +21,7 @@
   <script>window.SITE_ROOT = "./";</script>
   <script src="assets/js/data.js" defer></script>
   <script src="assets/js/wave-gallery.js" defer></script>
+  <script src="assets/js/liquid-intro.js" defer></script>
   <script src="assets/js/app.js" defer></script>
 </head>
 <body data-page="home">

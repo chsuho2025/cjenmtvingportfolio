@@ -6,7 +6,7 @@ window.initWaveGallery = function(root, options = {}) {
   const toggle = document.querySelector('.motion-toggle');
   let enabled = options.enabled !== false;
   // Motion follows system accessibility preferences; no extra UI controls.
-  let active = false, visible = true, modalOpen = false, raf = 0, last = 0, elapsed = 0;
+  let active = false, visible = true, modalOpen = false, introPlaying = false, raf = 0, last = 0, elapsed = 0;
   const pointer = {x:0,y:0,tx:0,ty:0,energy:0};
   const vertex = `
     precision mediump float;
@@ -117,14 +117,14 @@ window.initWaveGallery = function(root, options = {}) {
     gl.drawArrays(gl.TRIANGLES,0,p.count);
   }
   function tick(time){
-    raf=0;if(!active||document.hidden||!visible||modalOpen)return;
+    raf=0;if(!active||document.hidden||!visible||modalOpen||introPlaying)return;
     const dt=Math.min(last?(time-last)/1000:1/60,.05);last=time;elapsed+=dt;
     const smooth=1-Math.exp(-dt*5);
     pointer.x+=(pointer.tx-pointer.x)*smooth;pointer.y+=(pointer.ty-pointer.y)*smooth;pointer.energy*=Math.exp(-dt*2.5);
     for(const p of planes){if(!p.ready)continue;p.hover+=(p.target-p.hover)*smooth;draw(p);}
     raf=requestAnimationFrame(tick);
   }
-  function kick(){if(active&&!raf&&!document.hidden&&visible&&!modalOpen){last=0;raf=requestAnimationFrame(tick);}}
+  function kick(){if(active&&!raf&&!document.hidden&&visible&&!modalOpen&&!introPlaying){last=0;raf=requestAnimationFrame(tick);}}
   function sync(){
     const supported=planes.some(p=>p.ready);
     active=enabled&&!reduce.matches&&supported;
@@ -140,6 +140,7 @@ window.initWaveGallery = function(root, options = {}) {
   root.addEventListener('pointerleave',()=>{pointer.tx=pointer.ty=0;});
   toggle?.addEventListener('click',()=>{enabled=!enabled;try{localStorage.setItem('portfolio-motion',enabled?'on':'off');}catch(_){}sync();});
   [reduce,desktop].forEach(q=>q.addEventListener('change',sync));
+  document.addEventListener('portfolio:intro',e=>{introPlaying=!!e.detail.playing;if(introPlaying){cancelAnimationFrame(raf);raf=0;}else{pointer.energy=1;kick();}});
   document.addEventListener('portfolio:modal',e=>{modalOpen=!!e.detail.open;if(modalOpen){cancelAnimationFrame(raf);raf=0;}else kick();});
   document.addEventListener('visibilitychange',()=>{if(document.hidden){cancelAnimationFrame(raf);raf=0;}else kick();});
   const observer=new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;if(visible)kick();else{cancelAnimationFrame(raf);raf=0;}},{rootMargin:'80px'});observer.observe(root);

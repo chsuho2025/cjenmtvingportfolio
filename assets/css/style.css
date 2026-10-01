@@ -453,3 +453,17 @@ button { font: inherit; }
 }
 
 .card__work-name { display:block; margin-top:4px; font-size:16px; font-weight:500; color:#555; }
+
+/* Arrival: three joined droplets unfold into the portfolio. */
+.liquid-intro { position:fixed; inset:0; z-index:20; pointer-events:none; background:#fff; overflow:hidden; }
+.liquid-intro svg { display:block; overflow:visible; }
+.has-liquid-intro { overflow:hidden; }
+.has-liquid-intro .card__frame { opacity:0; pointer-events:none; }
+.has-liquid-intro .site-header, .has-liquid-intro .home__title, .has-liquid-intro .card__caption { opacity:0; transform:translateY(24px); }
+.site-header, .home__title, .card__caption { transition:opacity .65s var(--ease),transform .85s var(--ease); }
+.has-liquid-intro.intro-text-in .site-header, .has-liquid-intro.intro-text-in .home__title, .has-liquid-intro.intro-text-in .card__caption { opacity:1; transform:none; }
+.has-liquid-intro.intro-text-in .card__caption { transition-delay:calc(180ms + var(--i) * 80ms); }
+@media(prefers-reduced-motion:reduce) {
+ .liquid-intro { display:none; }
+ .site-header, .home__title, .card__caption { transition:none; }
+}
