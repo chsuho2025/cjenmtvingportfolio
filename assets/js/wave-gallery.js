@@ -157,11 +157,15 @@ window.initWaveGallery = function(root) {
       function upload() {
         if(!usable||!img.naturalWidth)return;
         // Upload a bounded square thumbnail once, instead of decoding a full-size image per frame.
-        const thumb=document.createElement('canvas');thumb.width=thumb.height=640;
-        const ctx=thumb.getContext('2d');const side=Math.min(img.naturalWidth,img.naturalHeight);
-        ctx.drawImage(img,(img.naturalWidth-side)/2,(img.naturalHeight-side)/2,side,side,0,0,640,640);
+        let source=img;
+        if(img.naturalWidth!==640||img.naturalHeight!==640) {
+          const thumb=document.createElement('canvas');thumb.width=thumb.height=640;
+          const ctx=thumb.getContext('2d');const side=Math.min(img.naturalWidth,img.naturalHeight);
+          ctx.drawImage(img,(img.naturalWidth-side)/2,(img.naturalHeight-side)/2,side,side,0,0,640,640);
+          source=thumb;
+        }
         gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,imageTexture);
-        gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,thumb);ready=true;draw();
+        gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,source);ready=true;draw();
       }
       if(img.complete)upload();else img.addEventListener('load',upload,{once:true});
       canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();usable=false;p.fallback=true;canvas.remove();p.frame.classList.remove('liquid-ready');});

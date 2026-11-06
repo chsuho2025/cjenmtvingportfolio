@@ -33,7 +33,7 @@ window.PORTFOLIO = {
       "lead": "SaaS와 생성형 AI 도구를 제작 공정별로 연결하고, 기획·연출·검수를 거쳐 유튜브 채널 《코바바의 경제학》의 영상을 제작했습니다.",
       "card": {
         "type": "image",
-        "src": "assets/media/antiframe/cobava-bankrun-youtube-cover.svg",
+        "src": "assets/media/antiframe/cobava-bankrun-safari.jpg",
         "poster": null,
         "alt": "코바바의 경제학 — 뱅크런 영상의 실제 유튜브 썸네일",
         "position": "50% 50%"
