@@ -536,6 +536,11 @@ button { font: inherit; }
 .article-steps p + p { margin-top:12px; }
 .article-steps .article-step-output { margin-top:16px; color:#727b88; font-size:13px; line-height:1.75; }
 .article-media { display:grid; gap:24px; margin:28px 0; }
+.article-code { min-width:0; max-width:100%; margin:24px 0 32px; }
+.article-code figcaption { margin-bottom:10px; color:var(--muted); font-size:14px; }
+.article-code pre { max-width:100%; overflow-x:auto; padding:20px; margin:0; border:1px solid #29313d; border-radius:14px; background:#171d26; color:#eef2f7; font:14px/1.75 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; tab-size:2; }
+.article-code pre:focus-visible { outline:2px solid #537dad; outline-offset:3px; }
+.article-code code { font:inherit; }
 .article-media .media { --media-max-h:580px; }
 .article-media--pair { grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; }
 .article-media--pair .media { width:100%; }

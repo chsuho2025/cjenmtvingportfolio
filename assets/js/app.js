@@ -141,12 +141,13 @@
         const prose = part.body ? `<div class="prose">${paragraphs(part.body)}</div>` : '';
         const steps = part.steps ? `<ol class="article-steps">${part.steps.map((step,i)=>`<li><h4><span>${String(i+1).padStart(2,'0')}</span>${text(step.title)}</h4>${paragraphs(step.body || [step.desc])}${step.output ? `<p class="article-step-output">${text(step.output)}</p>` : ''}</li>`).join('')}</ol>` : '';
         const mediaItems = part.media ? `<div class="article-media${part.media.length>1 ? ' article-media--pair' : ''}">${part.media.map(m=>media(m)).join('')}</div>` : '';
+        const code = part.code && filled(part.code.source) ? `<figure class="article-code"><figcaption>${esc(part.code.label || '핵심 구현 로직')}</figcaption><pre tabindex="0" aria-label="${esc(part.code.label || '핵심 구현 로직')}"><code class="language-${esc(part.code.language || 'text')}">${esc(part.code.source)}</code></pre></figure>` : '';
         const table = part.table ? renderers.matrix({...part.table,heading:part.heading || sec.heading}) : '';
         const comparison = part.compare ? `<div class="article-comparison">${compare(part.compare)}</div>` : '';
         const audio = part.audioItems ? renderers.layers({items:part.audioItems}) : '';
         const bullets = part.bullets ? `<ul class="article-list">${part.bullets.map(item=>`<li>${text(item)}</li>`).join('')}</ul>` : '';
         const note = part.note ? `<aside class="article-note">${part.note.label ? `<h4>${text(part.note.label)}</h4>` : ''}${paragraphs(part.note.body)}</aside>` : '';
-        return `<div class="article-part">${heading}${prose}${steps}${mediaItems}${table}${comparison}${audio}${bullets}${note}</div>`;
+        return `<div class="article-part">${heading}${prose}${steps}${mediaItems}${code}${table}${comparison}${audio}${bullets}${note}</div>`;
       }).join('');
     },
     "live-demo"(s) {

@@ -158,6 +158,57 @@ window.PORTFOLIO = {
         },
         {
           "type": "article",
+          "heading": "렌더 전 검토와 출력 작업 관리",
+          "parts": [
+            {
+              "body": [
+                "제작자가 직접 검토하고 출력 작업을 관리할 수 있도록 요구사항을 정리하고, 영상 검토 페이지와 렌더 센터를 개선했습니다."
+              ]
+            },
+            {
+              "heading": "파일 출력 없이 수정 장면을 확인하는 검토 페이지",
+              "body": [
+                "장면 코드를 브라우저에서 실행해, 전체 영상을 파일로 출력하기 전에 수정한 화면을 확인합니다. 음성을 함께 들으며 필요한 시각으로 이동하고, 수정 메모를 해당 시각과 함께 남깁니다. **수정할 때마다 전체 렌더 완료를 기다리는 과정을 줄이고, 피드백과 재확인을 연결하기 위한 화면입니다.**"
+              ],
+              "media": [
+                {
+                  "type": "image",
+                  "src": "assets/media/antiframe/render-workflow/review-page.png",
+                  "aspect": "914/753",
+                  "alt": "코바바 검토 페이지",
+                  "caption": "영상 파일 출력 전 장면 확인·시각별 수정 메모"
+                }
+              ],
+              "code": {
+                "language": "javascript",
+                "label": "핵심 구현 로직 · 축약 예시",
+                "source": "// 실제 구현의 핵심 흐름을 축약한 예시\nasync function showFrame(time) {\n  await sceneWindow.renderFrame(time); // 지정 시각의 장면 그리기\n}\nfunction play() {\n  if (!playing) return;\n  showFrame(audio.currentTime);         // 음성 시각에 맞춰 화면 갱신\n  requestAnimationFrame(play);\n}\nfunction seek(time) {\n  audio.currentTime = time;\n  showFrame(time);                      // 선택한 장면만 바로 확인\n}"
+              }
+            },
+            {
+              "heading": "대기열과 진행·완료 기록을 관리하는 렌더 센터",
+              "body": [
+                "검토 후 요청한 작업은 통합 대기열에서 관리하고, 프레임 묶음을 최대 6개 워커가 나누어 처리합니다. 진행률·남은 시간·완료 이력과 장비 상태를 한곳에서 확인합니다. **출력 작업을 매번 개별 실행·확인하는 부담을 줄이고, 승인한 최종본까지 순서대로 처리하기 위한 화면입니다.**"
+              ],
+              "media": [
+                {
+                  "type": "image",
+                  "src": "assets/media/antiframe/render-workflow/render-center.png",
+                  "aspect": "916/923",
+                  "alt": "코바바 렌더 센터",
+                  "caption": "작업 대기열·진행률·완료 이력 관리"
+                }
+              ],
+              "code": {
+                "language": "javascript",
+                "label": "핵심 구현 로직 · 축약 예시",
+                "source": "// 실제 구현의 핵심 흐름을 축약한 예시\nasync function workerLoop(worker) {\n  while (!STOP) {\n    const task = nextTask(worker);      // 승인·자원 조건을 통과한 작업\n    if (!task) { await sleep(400); continue; }\n    const { J, c } = task;\n    await ensurePage(worker, J);\n    await renderChunk(worker, J, c);    // 프레임 묶음 처리\n    c.st = 'ok';\n    if (J.chunks.every(c => c.st === 'ok')) joinJob(J);\n  }\n}\nworkers.forEach(worker => workerLoop(worker));"
+              }
+            }
+          ]
+        },
+        {
+          "type": "article",
           "heading": "생성 결과를 그대로 사용하지 않고 연출 의도에 맞게 수정",
           "parts": [
             {
